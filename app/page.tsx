@@ -1,9 +1,18 @@
-import Image from "next/image";
+import { getInventory } from "@/features/inventory/api/get-inventory";
+import { InventoryTable } from "@/features/inventory/components/inventory-table";
 
-export default function Home() {
+export default async function HomePage() {
+  const inventory = await getInventory();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start"></main>
-    </div>
+    <main className="p-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">SupplyVector Dashboard</h1>
+
+        <p className="text-gray-500">Inventory monitoring system</p>
+      </div>
+
+      <InventoryTable items={inventory} />
+    </main>
   );
 }
