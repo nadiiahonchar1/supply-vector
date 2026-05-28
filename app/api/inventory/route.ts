@@ -7,9 +7,18 @@ export async function GET(request: Request) {
 
   const lowStock = searchParams.get("lowStock") === "true";
 
+  const search = searchParams.get("search") || undefined;
+
+  const page = Number(searchParams.get("page") || 1);
+
+  const limit = Number(searchParams.get("limit") || 20);
+
   const data = await getInventory({
     city,
     lowStock,
+    search,
+    page,
+    limit,
   });
 
   return Response.json(data);
