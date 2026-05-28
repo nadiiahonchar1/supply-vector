@@ -12,3 +12,8 @@ export type InventoryItem = {
 };
 
 export type LowStockItem = InventoryItem;
+
+export type InventoryFilters = {
+  city?: string;
+  lowStock?: boolean;
+};
