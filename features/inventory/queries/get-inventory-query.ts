@@ -9,6 +9,21 @@ export async function getInventoryQuery(
   const lowStockFilter = filters?.lowStock
     ? sql`AND i.quantity < i.min_stock`
     : sql``;
+  
+  const searchFilter = filters?.search
+    ? sql`
+        AND (
+          p.name ILIKE ${`%${filters.search}%`}
+          OR p.sku ILIKE ${`%${filters.search}%`}
+          OR s.name ILIKE ${`%${filters.search}%`}
+        )
+      `
+    : sql``;
+
+  const page = filters?.page || 1;
+  const limit = filters?.limit || 20;
+
+  const offset = (page - 1) * limit;
 
   const result = await sql`
     SELECT
@@ -16,7 +31,7 @@ export async function getInventoryQuery(
       s.name as store_name,
       s.city,
 
-      p.id as product_id, 
+      p.id as product_id,
       p.name as product_name,
       p.sku,
 
@@ -34,8 +49,12 @@ export async function getInventoryQuery(
     WHERE 1=1
     ${cityFilter}
     ${lowStockFilter}
+    ${searchFilter}
 
-    ORDER BY s.name, p.name;
+    ORDER BY s.name, p.name
+
+    LIMIT ${limit}
+    OFFSET ${offset};
   `;
 
   return result as InventoryItem[];
