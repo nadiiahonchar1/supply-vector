@@ -38,3 +38,25 @@ CREATE TABLE inventory (
 
   UNIQUE(store_id, product_id)
 );
+
+CREATE TABLE shipments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  source_store_id UUID NOT NULL REFERENCES stores(id),
+  destination_store_id UUID NOT NULL REFERENCES stores(id),
+
+  status TEXT NOT NULL DEFAULT 'pending',
+
+  created_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP
+);
+
+CREATE TABLE shipment_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  shipment_id UUID NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+
+  product_id UUID NOT NULL REFERENCES products(id),
+
+  quantity INTEGER NOT NULL CHECK (quantity > 0)
+);
