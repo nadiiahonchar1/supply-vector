@@ -49,3 +49,5 @@ export type ShipmentDetails = {
 
   items: ShipmentDetailsItem[];
 };
+
+export type ShipmentStatus = Shipment["status"];

@@ -1,6 +1,7 @@
 import { sql } from "@/db";
+import { ShipmentDetails } from "../types";
 
-export async function getShipmentsQuery() {
+export async function getShipmentsQuery(): Promise<ShipmentDetails[]> {
   const rows = await sql`
     SELECT
       sh.id as shipment_id,
@@ -39,7 +40,7 @@ export async function getShipmentsQuery() {
   `;
 
   // 🔥 GROUPING (JS SIDE)
-  const shipmentsMap = new Map();
+  const shipmentsMap = new Map<string, ShipmentDetails>();
 
   for (const row of rows) {
     if (!shipmentsMap.has(row.shipment_id)) {
@@ -65,7 +66,7 @@ export async function getShipmentsQuery() {
       });
     }
 
-    const shipment = shipmentsMap.get(row.shipment_id);
+    const shipment = shipmentsMap.get(row.shipment_id)!;
 
     shipment.items.push({
       product_id: row.product_id,
