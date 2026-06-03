@@ -51,3 +51,9 @@ export type ShipmentDetails = {
 };
 
 export type ShipmentStatus = Shipment["status"];
+
+export type ShipmentFilters = {
+  status?: Shipment["status"];
+  sourceStoreId?: string;
+  destinationStoreId?: string;
+};
