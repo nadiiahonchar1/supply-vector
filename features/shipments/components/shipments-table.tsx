@@ -1,4 +1,5 @@
 import type { ShipmentDetails } from "../types";
+import { ShipmentStatusBadge } from "./shipment-status-badge";
 
 type Props = {
   shipments: ShipmentDetails[];
@@ -19,22 +20,23 @@ export function ShipmentsTable({ shipments }: Props) {
         </thead>
 
         <tbody>
-          {shipments.map((shipment) => (
-            <tr key={shipment.shipment_id}>
-              <td>{shipment.status}</td>
-
+          {shipments.map((s) => (
+            <tr key={s.shipment_id}>
               <td>
-                {shipment.source_store.name} ({shipment.source_store.city})
+                <ShipmentStatusBadge status={s.status} />
               </td>
 
               <td>
-                {shipment.destination_store.name} (
-                {shipment.destination_store.city})
+                {s.source_store.name} ({s.source_store.city})
               </td>
 
-              <td>{shipment.items.length}</td>
+              <td>
+                {s.destination_store.name} ({s.destination_store.city})
+              </td>
 
-              <td>{new Date(shipment.created_at).toLocaleString()}</td>
+              <td>{s.items.length}</td>
+
+              <td>{new Date(s.created_at).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
