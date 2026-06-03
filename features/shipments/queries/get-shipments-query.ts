@@ -1,7 +1,21 @@
 import { sql } from "@/db";
-import { ShipmentDetails } from "../types";
+import { ShipmentDetails, ShipmentFilters } from "../types";
 
-export async function getShipmentsQuery(): Promise<ShipmentDetails[]> {
+export async function getShipmentsQuery(
+  filters?: ShipmentFilters,
+): Promise<ShipmentDetails[]> {
+  const statusFilter = filters?.status
+    ? sql`AND sh.status = ${filters.status}`
+    : sql``;
+
+  const sourceStoreFilter = filters?.sourceStoreId
+    ? sql`AND sh.source_store_id = ${filters.sourceStoreId}`
+    : sql``;
+
+  const destinationStoreFilter = filters?.destinationStoreId
+    ? sql`AND sh.destination_store_id = ${filters.destinationStoreId}`
+    : sql``;
+  
   const rows = await sql`
     SELECT
       sh.id as shipment_id,
@@ -35,6 +49,11 @@ export async function getShipmentsQuery(): Promise<ShipmentDetails[]> {
 
     JOIN products p
       ON p.id = si.product_id
+
+    WHERE 1=1
+      ${statusFilter}
+      ${sourceStoreFilter}
+      ${destinationStoreFilter}
 
     ORDER BY sh.created_at DESC;
   `;

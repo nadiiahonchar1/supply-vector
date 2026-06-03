@@ -1,10 +1,16 @@
+export type ShipmentStatus =
+  | "pending"
+  | "in_transit"
+  | "completed"
+  | "cancelled";
+
 export type Shipment = {
   id: string;
 
   source_store_id: string;
   destination_store_id: string;
 
-  status: "pending" | "in_transit" | "completed" | "cancelled";
+  status: ShipmentStatus;
 
   created_at: string;
   completed_at: string | null;
@@ -30,7 +36,7 @@ export type ShipmentDetailsItem = {
 export type ShipmentDetails = {
   shipment_id: string;
 
-  status: Shipment["status"];
+  status: ShipmentStatus;
 
   created_at: string;
   completed_at: string | null;
@@ -50,10 +56,8 @@ export type ShipmentDetails = {
   items: ShipmentDetailsItem[];
 };
 
-export type ShipmentStatus = Shipment["status"];
-
 export type ShipmentFilters = {
-  status?: Shipment["status"];
+  status?: ShipmentStatus;
   sourceStoreId?: string;
   destinationStoreId?: string;
 };
