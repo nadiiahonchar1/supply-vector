@@ -13,6 +13,7 @@ export function ShipmentsFilters({ stores }: Props) {
 
   const currentStatus = searchParams.get("status") ?? "";
   const currentStore = searchParams.get("sourceStoreId") ?? "";
+  const currentDestination = searchParams.get("destinationStoreId") ?? "";
 
   function updateParams(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -24,6 +25,10 @@ export function ShipmentsFilters({ stores }: Props) {
     }
 
     router.push(`/shipments?${params.toString()}`);
+  }
+
+  function resetFilters() {
+    router.push("/shipments");
   }
 
   return (
@@ -52,6 +57,19 @@ export function ShipmentsFilters({ stores }: Props) {
           </option>
         ))}
       </select>
+
+      <select
+        value={currentDestination}
+        onChange={(e) => updateParams("destinationStoreId", e.target.value)}
+      >
+        <option value="">All destinations</option>
+        {stores.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} ({s.city})
+          </option>
+        ))}
+      </select>
+      <button onClick={resetFilters}>Reset</button>
     </div>
   );
 }
