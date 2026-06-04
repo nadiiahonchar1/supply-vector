@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 import type { StoreOption } from "@/features/stores/types";
 
 type Props = {
@@ -10,9 +11,10 @@ type Props = {
 export function ShipmentsFilters({ stores }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const currentStatus = searchParams.get("status") ?? "";
-  const currentStore = searchParams.get("sourceStoreId") ?? "";
+  const currentSource = searchParams.get("sourceStoreId") ?? "";
   const currentDestination = searchParams.get("destinationStoreId") ?? "";
 
   function updateParams(key: string, value: string) {
@@ -28,12 +30,24 @@ export function ShipmentsFilters({ stores }: Props) {
   }
 
   function resetFilters() {
-    router.push("/shipments");
+    startTransition(() => {
+      router.push("/shipments");
+    });
   }
 
   return (
-    <div style={{ marginBottom: 16, display: "flex", gap: 12 }}>
-      {/* STATUS */}
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        marginBottom: 16,
+        alignItems: "center",
+      }}
+    >
+      {isPending && (
+        <span style={{ fontSize: 12, color: "#888" }}>Loading...</span>
+      )}
+
       <select
         value={currentStatus}
         onChange={(e) => updateParams("status", e.target.value)}
@@ -46,14 +60,13 @@ export function ShipmentsFilters({ stores }: Props) {
       </select>
 
       <select
-        value={currentStore}
+        value={currentSource}
         onChange={(e) => updateParams("sourceStoreId", e.target.value)}
       >
-        <option value="">All stores</option>
-
-        {stores.map((store) => (
-          <option key={store.id} value={store.id}>
-            {store.name} ({store.city})
+        <option value="">All sources</option>
+        {stores.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} ({s.city})
           </option>
         ))}
       </select>
@@ -69,6 +82,7 @@ export function ShipmentsFilters({ stores }: Props) {
           </option>
         ))}
       </select>
+
       <button onClick={resetFilters}>Reset</button>
     </div>
   );
