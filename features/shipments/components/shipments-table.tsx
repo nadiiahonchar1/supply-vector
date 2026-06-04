@@ -18,8 +18,17 @@ export function ShipmentsTable({ shipments }: Props) {
     status: ShipmentStatus,
   ) {
     await updateShipmentStatus(shipmentId, status);
-
     router.refresh();
+  }
+
+  async function handleCancel(shipmentId: string) {
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this shipment?",
+    );
+
+    if (!confirmed) return;
+
+    await handleStatusUpdate(shipmentId, "cancelled");
   }
 
   return (
@@ -32,6 +41,7 @@ export function ShipmentsTable({ shipments }: Props) {
             <th align="left">Destination</th>
             <th align="left">Items</th>
             <th align="left">Created</th>
+            <th align="left">Completed</th>
             <th align="left">Actions</th>
           </tr>
         </thead>
@@ -56,7 +66,28 @@ export function ShipmentsTable({ shipments }: Props) {
               <td>{new Date(s.created_at).toLocaleString()}</td>
 
               <td>
-                {s.status !== "completed" && (
+                {s.completed_at
+                  ? new Date(s.completed_at).toLocaleString()
+                  : "-"}
+              </td>
+
+              <td>
+                {s.status === "pending" && (
+                  <>
+                    <button
+                      onClick={() =>
+                        handleStatusUpdate(s.shipment_id, "in_transit")
+                      }
+                    >
+                      Start delivery
+                    </button>{" "}
+                    <button onClick={() => handleCancel(s.shipment_id)}>
+                      Cancel
+                    </button>
+                  </>
+                )}
+
+                {s.status === "in_transit" && (
                   <button
                     onClick={() =>
                       handleStatusUpdate(s.shipment_id, "completed")
@@ -64,15 +95,10 @@ export function ShipmentsTable({ shipments }: Props) {
                   >
                     Complete
                   </button>
-                )}{" "}
-                {s.status !== "cancelled" && (
-                  <button
-                    onClick={() =>
-                      handleStatusUpdate(s.shipment_id, "cancelled")
-                    }
-                  >
-                    Cancel
-                  </button>
+                )}
+
+                {(s.status === "completed" || s.status === "cancelled") && (
+                  <span style={{ color: "#888" }}>No actions</span>
                 )}
               </td>
             </tr>
