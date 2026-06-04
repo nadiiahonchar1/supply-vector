@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
 import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
 import { ShipmentsPage } from "@/features/shipments/components/shipments-page";
+import { ShipmentsSkeleton } from "@/features/shipments/components/shipments-skeleton";
 import { ShipmentStatus } from "@/features/shipments/types";
 
 type SearchParams = {
@@ -48,6 +50,8 @@ export default async function Page({
 
   // return <ShipmentsPage shipments={shipments} filters={filters} />;
   return (
-    <ShipmentsPage shipments={shipments} filters={filters} stores={stores} />
+    <Suspense fallback={<ShipmentsSkeleton />}>
+      <ShipmentsPage shipments={shipments} filters={filters} stores={stores} />
+    </Suspense>
   );
 }
