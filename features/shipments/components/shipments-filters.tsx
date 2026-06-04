@@ -1,33 +1,56 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import type { StoreOption } from "@/features/stores/types";
 
-export function ShipmentsFilters() {
+type Props = {
+  stores: StoreOption[];
+};
+
+export function ShipmentsFilters({ stores }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const currentStatus = searchParams.get("status") ?? "";
+  const currentStore = searchParams.get("sourceStoreId") ?? "";
 
-  function setStatus(status: string) {
+  function updateParams(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
 
-    if (status) {
-      params.set("status", status);
+    if (value) {
+      params.set(key, value);
     } else {
-      params.delete("status");
+      params.delete(key);
     }
 
     router.push(`/shipments?${params.toString()}`);
   }
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <select value={currentStatus} onChange={(e) => setStatus(e.target.value)}>
+    <div style={{ marginBottom: 16, display: "flex", gap: 12 }}>
+      {/* STATUS */}
+      <select
+        value={currentStatus}
+        onChange={(e) => updateParams("status", e.target.value)}
+      >
         <option value="">All statuses</option>
         <option value="pending">Pending</option>
         <option value="in_transit">In transit</option>
         <option value="completed">Completed</option>
         <option value="cancelled">Cancelled</option>
+      </select>
+
+      <select
+        value={currentStore}
+        onChange={(e) => updateParams("sourceStoreId", e.target.value)}
+      >
+        <option value="">All stores</option>
+
+        {stores.map((store) => (
+          <option key={store.id} value={store.id}>
+            {store.name} ({store.city})
+          </option>
+        ))}
       </select>
     </div>
   );

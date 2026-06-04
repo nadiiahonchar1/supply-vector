@@ -1,4 +1,5 @@
 import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
+import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
 import { ShipmentsPage } from "@/features/shipments/components/shipments-page";
 import { ShipmentStatus } from "@/features/shipments/types";
 
@@ -38,7 +39,15 @@ export default async function Page({
     destinationStoreId: params.destinationStoreId,
   };
 
-  const shipments = await getShipmentsQuery(filters);
+  // const shipments = await getShipmentsQuery(filters);
 
-  return <ShipmentsPage shipments={shipments} filters={filters} />;
+  const [shipments, stores] = await Promise.all([
+    getShipmentsQuery(filters),
+    getStoresQuery(),
+  ]);
+
+  // return <ShipmentsPage shipments={shipments} filters={filters} />;
+  return (
+    <ShipmentsPage shipments={shipments} filters={filters} stores={stores} />
+  );
 }
