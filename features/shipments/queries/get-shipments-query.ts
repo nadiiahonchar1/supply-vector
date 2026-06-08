@@ -1,5 +1,6 @@
 import { sql } from "@/db";
-import { ShipmentDetails, ShipmentFilters } from "../types";
+import { ShipmentDetails, ShipmentFilters, ShipmentRow } from "../types";
+import { mapShipmentRows } from "../utils/map-shipment-rows";
 
 export async function getShipmentsQuery(
   filters?: ShipmentFilters,
@@ -15,7 +16,7 @@ export async function getShipmentsQuery(
   const destinationStoreFilter = filters?.destinationStoreId
     ? sql`AND sh.destination_store_id = ${filters.destinationStoreId}`
     : sql``;
-  
+
   const rows = await sql`
     SELECT
       sh.id as shipment_id,
@@ -25,16 +26,17 @@ export async function getShipmentsQuery(
 
       ss.id as source_store_id,
       ss.name as source_store_name,
-      ss.city as source_city,
+      ss.city as source_store_city,
 
       ds.id as destination_store_id,
       ds.name as destination_store_name,
-      ds.city as destination_city,
+      ds.city as destination_store_city,
 
-      si.quantity,
       p.id as product_id,
       p.name as product_name,
-      p.sku
+      p.sku as product_sku,
+
+      si.quantity
 
     FROM shipments sh
 
@@ -57,42 +59,6 @@ export async function getShipmentsQuery(
 
     ORDER BY sh.created_at DESC;
   `;
-  
-  const shipmentsMap = new Map<string, ShipmentDetails>();
 
-  for (const row of rows) {
-    if (!shipmentsMap.has(row.shipment_id)) {
-      shipmentsMap.set(row.shipment_id, {
-        shipment_id: row.shipment_id,
-        status: row.status,
-        created_at: row.created_at,
-        completed_at: row.completed_at,
-
-        source_store: {
-          id: row.source_store_id,
-          name: row.source_store_name,
-          city: row.source_city,
-        },
-
-        destination_store: {
-          id: row.destination_store_id,
-          name: row.destination_store_name,
-          city: row.destination_city,
-        },
-
-        items: [],
-      });
-    }
-
-    const shipment = shipmentsMap.get(row.shipment_id)!;
-
-    shipment.items.push({
-      product_id: row.product_id,
-      name: row.product_name,
-      sku: row.sku,
-      quantity: row.quantity,
-    });
-  }
-
-  return Array.from(shipmentsMap.values());
+  return mapShipmentRows(rows as ShipmentRow[]);
 }

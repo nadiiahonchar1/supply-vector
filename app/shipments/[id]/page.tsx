@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getShipmentByIDQuery } from "@/features/shipments/queries/get-shipment-by-id-query";
+import { getShipmentByIdQuery } from "@/features/shipments/queries/get-shipment-by-id-query";
 import { ShipmentDetailsPage } from "@/features/shipments/components/shipment-details-page";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
 export default async function Page({ params }: Props) {
   const { id } = await params;
 
-  const shipment = await getShipmentByIDQuery(id);
+  const shipment = await getShipmentByIdQuery(id);
 
   if (!shipment) {
     notFound();

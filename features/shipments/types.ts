@@ -61,3 +61,23 @@ export type ShipmentFilters = {
   sourceStoreId?: string;
   destinationStoreId?: string;
 };
+
+export type ShipmentRow = {
+  shipment_id: string;
+  status: ShipmentDetails["status"];
+  created_at: string;
+  completed_at: string | null;
+
+  source_store_id: string;
+  source_store_name: string;
+  source_store_city: string;
+
+  destination_store_id: string;
+  destination_store_name: string;
+  destination_store_city: string;
+
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+};
