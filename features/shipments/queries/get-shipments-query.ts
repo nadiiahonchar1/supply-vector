@@ -57,8 +57,7 @@ export async function getShipmentsQuery(
 
     ORDER BY sh.created_at DESC;
   `;
-
-  // 🔥 GROUPING (JS SIDE)
+  
   const shipmentsMap = new Map<string, ShipmentDetails>();
 
   for (const row of rows) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import type { ShipmentDetails, ShipmentStatus } from "../types";
 import { ShipmentStatusBadge } from "./shipment-status-badge";
@@ -100,6 +101,9 @@ export function ShipmentsTable({ shipments }: Props) {
                 {(s.status === "completed" || s.status === "cancelled") && (
                   <span style={{ color: "#888" }}>No actions</span>
                 )}
+              </td>
+              <td>
+                <Link href={`/shipments/${s.shipment_id}`}>View details</Link>
               </td>
             </tr>
           ))}
