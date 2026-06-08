@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import type { ShipmentDetails, ShipmentStatus } from "../types";
 import { ShipmentStatusBadge } from "./shipment-status-badge";
-import { updateShipmentStatus } from "../api/update-shipment-status";
+import { updateShipmentStatusAction } from "../actions/update-shipment-status";
 
 type Props = {
   shipments: ShipmentDetails[];
@@ -18,7 +18,7 @@ export function ShipmentsTable({ shipments }: Props) {
     shipmentId: string,
     status: ShipmentStatus,
   ) {
-    await updateShipmentStatus(shipmentId, status);
+    await updateShipmentStatusAction({ shipmentId, status });
     router.refresh();
   }
 
