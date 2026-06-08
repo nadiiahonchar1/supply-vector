@@ -17,19 +17,24 @@ export function ShipmentsTable({ shipments }: Props) {
   async function handleStatusUpdate(
     shipmentId: string,
     status: ShipmentStatus,
+    currentStatus: ShipmentStatus,
   ) {
-    await updateShipmentStatusAction({ shipmentId, status });
+    await updateShipmentStatusAction({ shipmentId, status, currentStatus });
     router.refresh();
   }
 
-  async function handleCancel(shipmentId: string) {
+  async function handleCancel(shipment: ShipmentDetails) {
     const confirmed = window.confirm(
       "Are you sure you want to cancel this shipment?",
     );
 
     if (!confirmed) return;
 
-    await handleStatusUpdate(shipmentId, "cancelled");
+    await handleStatusUpdate(
+      shipment.shipment_id,
+      "cancelled",
+      shipment.status,
+    );
   }
 
   return (
@@ -77,21 +82,19 @@ export function ShipmentsTable({ shipments }: Props) {
                   <>
                     <button
                       onClick={() =>
-                        handleStatusUpdate(s.shipment_id, "in_transit")
+                        handleStatusUpdate(s.shipment_id, "completed", s.status)
                       }
                     >
                       Start delivery
                     </button>{" "}
-                    <button onClick={() => handleCancel(s.shipment_id)}>
-                      Cancel
-                    </button>
+                    <button onClick={() => handleCancel(s)}>Cancel</button>
                   </>
                 )}
 
                 {s.status === "in_transit" && (
                   <button
                     onClick={() =>
-                      handleStatusUpdate(s.shipment_id, "completed")
+                      handleStatusUpdate(s.shipment_id, "completed", s.status)
                     }
                   >
                     Complete
