@@ -89,3 +89,13 @@ export type ShipmentsStats = {
   cancelled: number;
   total: number;
 };
+
+export type CreateShipmentInput = {
+  sourceStoreId: string;
+  destinationStoreId: string;
+
+  items: {
+    productId: string;
+    quantity: number;
+  }[];
+};
