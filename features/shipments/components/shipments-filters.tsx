@@ -3,9 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import type { StoreOption } from "@/features/stores/types";
+import { ShipmentFilters } from "../types";
 
 type Props = {
   stores: StoreOption[];
+  filters: ShipmentFilters;
 };
 
 export function ShipmentsFilters({ stores }: Props) {

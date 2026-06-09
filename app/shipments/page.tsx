@@ -1,9 +1,10 @@
-import { Suspense } from "react";
+// import { Suspense } from "react";
 import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
 import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
 import { ShipmentsPage } from "@/features/shipments/components/shipments-page";
-import { ShipmentsSkeleton } from "@/features/shipments/components/shipments-skeleton";
-import { ShipmentStatus } from "@/features/shipments/types";
+// import { ShipmentsSkeleton } from "@/features/shipments/components/shipments-skeleton";
+import { getShipmentsStatsQuery } from "@/features/shipments/queries/get-shipments-stats-query";
+import { ShipmentStatus, ShipmentFilters } from "@/features/shipments/types";
 
 type SearchParams = {
   status?: string;
@@ -35,23 +36,26 @@ export default async function Page({
       : undefined
     : undefined;
 
-  const filters = {
+  const filters: ShipmentFilters = {
     status,
     sourceStoreId: params.sourceStoreId,
     destinationStoreId: params.destinationStoreId,
   };
 
-  // const shipments = await getShipmentsQuery(filters);
-
-  const [shipments, stores] = await Promise.all([
+  const [shipments, stores, stats] = await Promise.all([
     getShipmentsQuery(filters),
     getStoresQuery(),
+    getShipmentsStatsQuery(),
   ]);
 
-  // return <ShipmentsPage shipments={shipments} filters={filters} />;
   return (
-    <Suspense fallback={<ShipmentsSkeleton />}>
-      <ShipmentsPage shipments={shipments} filters={filters} stores={stores} />
-    </Suspense>
+    // <Suspense fallback={<ShipmentsSkeleton />}>
+    <ShipmentsPage
+      shipments={shipments}
+      filters={filters}
+      stores={stores}
+      stats={stats}
+    />
+    // </Suspense>
   );
 }

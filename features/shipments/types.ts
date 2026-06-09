@@ -81,3 +81,11 @@ export type ShipmentRow = {
   product_sku: string;
   quantity: number;
 };
+
+export type ShipmentsStats = {
+  pending: number;
+  in_transit: number;
+  completed: number;
+  cancelled: number;
+  total: number;
+};
