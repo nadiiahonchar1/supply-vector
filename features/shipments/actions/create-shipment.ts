@@ -25,11 +25,36 @@ export async function createShipmentAction(input: CreateShipmentInput) {
     throw new Error("Source and destination must be different");
   }
 
-  if (!items.length) {
+  const validItems = items.filter((i) => i.productId && i.quantity > 0);
+
+  if (!validItems.length) {
     throw new Error("At least one item is required");
   }
 
   const shipmentStatus: ShipmentStatus = "pending";
+
+  const productIds = validItems.map((i) => i.productId);
+
+  const inventoryRows = await sql`
+    SELECT product_id, quantity
+    FROM inventory
+    WHERE store_id = ${sourceStoreId}
+      AND product_id = ANY(${productIds})
+  `;
+
+  for (const item of validItems) {
+    const stock = inventoryRows.find((i) => i.product_id === item.productId);
+
+    if (!stock) {
+      throw new Error(
+        `Product ${item.productId} not found in source inventory`,
+      );
+    }
+
+    if (stock.quantity < item.quantity) {
+      throw new Error(`Not enough stock for product ${item.productId}`);
+    }
+  }
 
   const result = await sql`
     INSERT INTO shipments (
@@ -51,31 +76,37 @@ export async function createShipmentAction(input: CreateShipmentInput) {
 
   const shipmentId = result[0].id;
 
-  if (items.length) {
-    const values = items
-      .map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`)
-      .join(", ");
+  const values = validItems
+    .map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`)
+    .join(", ");
 
-    const flat = items.flatMap((item) => [
-      shipmentId,
-      item.productId,
-      item.quantity,
-    ]);
+  const flat = validItems.flatMap((item) => [
+    shipmentId,
+    item.productId,
+    item.quantity,
+  ]);
 
-    await sql.query(
-      `
-      INSERT INTO shipment_items (
-        shipment_id,
-        product_id,
-        quantity
-      )
-      VALUES ${values}
-    `,
-      flat,
-    );
+  await sql.query(
+    `
+    INSERT INTO shipment_items (
+      shipment_id,
+      product_id,
+      quantity
+    )
+    VALUES ${values}
+  `,
+    flat,
+  );
+
+  for (const item of validItems) {
+    await sql`
+      UPDATE inventory
+      SET quantity = quantity - ${item.quantity},
+          updated_at = NOW()
+      WHERE store_id = ${sourceStoreId}
+        AND product_id = ${item.productId}
+    `;
   }
 
-  return {
-    shipmentId,
-  };
+  return { shipmentId };
 }
