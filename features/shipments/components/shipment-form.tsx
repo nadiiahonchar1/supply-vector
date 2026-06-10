@@ -61,13 +61,29 @@ export function CreateShipmentForm({ stores, products }: Props) {
       return;
     }
 
+    const validItems = items.filter(
+      (item) => item.productId && item.quantity > 0,
+    );
+
+    if (!validItems.length) {
+      alert("Please select at least one product");
+      return;
+    }
+
+    const productIds = validItems.map((item) => item.productId);
+
+    if (new Set(productIds).size !== productIds.length) {
+      alert("Duplicate products are not allowed");
+      return;
+    }
+
     setLoading(true);
 
     try {
       await createShipmentAction({
         sourceStoreId,
         destinationStoreId,
-        items,
+        items: validItems,
       });
 
       router.push("/shipments");
@@ -120,11 +136,19 @@ export function CreateShipmentForm({ stores, products }: Props) {
             >
               <option value="">Select product</option>
 
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.sku})
-                </option>
-              ))}
+              {products
+                .filter(
+                  (product) =>
+                    product.id === item.productId ||
+                    !items.some(
+                      (selectedItem) => selectedItem.productId === product.id,
+                    ),
+                )
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.sku})
+                  </option>
+                ))}
             </select>
 
             <input
