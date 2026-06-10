@@ -2,6 +2,7 @@ import { getKpisQuery } from "@/features/analytics/queries/get-kpis-query";
 import { getInventoryQuery } from "@/features/inventory/queries/get-inventory-query";
 import { InventoryTable } from "@/features/inventory/components/inventory-table";
 import { KpiCard } from "@/features/analytics/components/kpi-card";
+import { LowStockWidget } from "@/features/inventory/components/low-stock-widget";
 
 export default async function HomePage() {
   const [inventory, kpis] = await Promise.all([
@@ -23,8 +24,10 @@ export default async function HomePage() {
         <KpiCard label="Critical Ratio" value={kpis.criticalRatio} />
       </div>
 
-      {/* INVENTORY TABLE */}
       <InventoryTable items={inventory} />
+      <div className="grid grid-cols-4 gap-4">
+        <LowStockWidget />
+      </div>
     </main>
   );
 }
