@@ -1,7 +1,7 @@
-import { getKpis } from "@/features/analytics/api/get-kpis";
+import { getKpisQuery } from "@/features/analytics/queries/get-kpis-query";
 
 export async function GET() {
-  const data = await getKpis();
+  const data = await getKpisQuery();
 
   return Response.json(data);
 }

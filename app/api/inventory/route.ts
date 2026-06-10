@@ -1,4 +1,4 @@
-import { getInventory } from "@/features/inventory/api/get-inventory";
+import { getInventoryQuery } from "@/features/inventory/queries/get-inventory-query";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const limit = Number(searchParams.get("limit") || 20);
 
-  const data = await getInventory({
+  const data = await getInventoryQuery({
     city,
     lowStock,
     search,

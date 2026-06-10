@@ -1,10 +1,13 @@
-import { getInventory } from "@/features/inventory/api/get-inventory";
-import { getKpis } from "@/features/analytics/api/get-kpis";
+import { getKpisQuery } from "@/features/analytics/queries/get-kpis-query";
+import { getInventoryQuery } from "@/features/inventory/queries/get-inventory-query";
 import { InventoryTable } from "@/features/inventory/components/inventory-table";
 import { KpiCard } from "@/features/analytics/components/kpi-card";
 
 export default async function HomePage() {
-  const [inventory, kpis] = await Promise.all([getInventory(), getKpis()]);
+  const [inventory, kpis] = await Promise.all([
+    getInventoryQuery(),
+    getKpisQuery(),
+  ]);
 
   return (
     <main className="p-8 space-y-8">
@@ -13,7 +16,6 @@ export default async function HomePage() {
         <p className="text-gray-500">Logistics & inventory system</p>
       </div>
 
-      {/* KPI SECTION */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard label="Stores" value={kpis.totalStores} />
         <KpiCard label="Products" value={kpis.totalProducts} />
