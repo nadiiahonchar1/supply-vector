@@ -41,34 +41,23 @@ export async function updateShipmentStatusAction({
     WHERE shipment_id = ${shipmentId}
   `;
 
-   if (currentStatus === "pending" && status === "in_transit") {
-     for (const item of items) {
-       const inventoryRows = await sql`
-      SELECT quantity
-      FROM inventory
-      WHERE store_id = ${shipment.source_store_id}
-        AND product_id = ${item.product_id}
-    `;
-
-       const inventory = inventoryRows[0];
-
-       if (!inventory) {
-         throw new Error(`Product ${item.product_id} not found in inventory`);
-       }
-
-       if (inventory.quantity < item.quantity) {
-         throw new Error(`Not enough stock for product ${item.product_id}`);
-       }
-
-       await sql`
+if (currentStatus === "pending" && status === "in_transit") {
+  for (const item of items) {
+    const result = await sql`
       UPDATE inventory
       SET quantity = quantity - ${item.quantity},
           updated_at = NOW()
       WHERE store_id = ${shipment.source_store_id}
         AND product_id = ${item.product_id}
+        AND quantity >= ${item.quantity}
+      RETURNING id
     `;
-     }
-   }
+
+    if (!result.length) {
+      throw new Error(`Not enough stock for product ${item.product_id}`);
+    }
+  }
+}
 
   const completedAt = status === "completed" ? new Date().toISOString() : null;
 

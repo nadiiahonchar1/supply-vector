@@ -19,7 +19,12 @@ export function ShipmentsTable({ shipments }: Props) {
     status: ShipmentStatus,
     currentStatus: ShipmentStatus,
   ) {
-    await updateShipmentStatusAction({ shipmentId, status, currentStatus });
+    await updateShipmentStatusAction({
+      shipmentId,
+      status,
+      currentStatus,
+    });
+
     router.refresh();
   }
 
@@ -49,6 +54,7 @@ export function ShipmentsTable({ shipments }: Props) {
             <th align="left">Created</th>
             <th align="left">Completed</th>
             <th align="left">Actions</th>
+            <th align="left">Link</th>
           </tr>
         </thead>
 
@@ -82,7 +88,11 @@ export function ShipmentsTable({ shipments }: Props) {
                   <>
                     <button
                       onClick={() =>
-                        handleStatusUpdate(s.shipment_id, "completed", s.status)
+                        handleStatusUpdate(
+                          s.shipment_id,
+                          "in_transit",
+                          s.status,
+                        )
                       }
                     >
                       Start delivery
@@ -105,6 +115,7 @@ export function ShipmentsTable({ shipments }: Props) {
                   <span style={{ color: "#888" }}>No actions</span>
                 )}
               </td>
+
               <td>
                 <Link href={`/shipments/${s.shipment_id}`}>View details</Link>
               </td>
