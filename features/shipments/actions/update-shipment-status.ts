@@ -41,24 +41,32 @@ export async function updateShipmentStatusAction({
     WHERE shipment_id = ${shipmentId}
   `;
 
-   if (currentStatus === "in_transit" && status === "completed") {
+   if (currentStatus === "pending" && status === "in_transit") {
      for (const item of items) {
+       const inventoryRows = await sql`
+      SELECT quantity
+      FROM inventory
+      WHERE store_id = ${shipment.source_store_id}
+        AND product_id = ${item.product_id}
+    `;
+
+       const inventory = inventoryRows[0];
+
+       if (!inventory) {
+         throw new Error(`Product ${item.product_id} not found in inventory`);
+       }
+
+       if (inventory.quantity < item.quantity) {
+         throw new Error(`Not enough stock for product ${item.product_id}`);
+       }
+
        await sql`
-        INSERT INTO inventory (
-          store_id,
-          product_id,
-          quantity
-        )
-        VALUES (
-          ${shipment.destination_store_id},
-          ${item.product_id},
-          ${item.quantity}
-        )
-        ON CONFLICT (store_id, product_id)
-        DO UPDATE SET
-          quantity = inventory.quantity + EXCLUDED.quantity,
+      UPDATE inventory
+      SET quantity = quantity - ${item.quantity},
           updated_at = NOW()
-      `;
+      WHERE store_id = ${shipment.source_store_id}
+        AND product_id = ${item.product_id}
+    `;
      }
    }
 
