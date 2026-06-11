@@ -98,15 +98,5 @@ export async function createShipmentAction(input: CreateShipmentInput) {
     flat,
   );
 
-  for (const item of validItems) {
-    await sql`
-      UPDATE inventory
-      SET quantity = quantity - ${item.quantity},
-          updated_at = NOW()
-      WHERE store_id = ${sourceStoreId}
-        AND product_id = ${item.productId}
-    `;
-  }
-
   return { shipmentId };
 }
