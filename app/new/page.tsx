@@ -1,4 +1,5 @@
 import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
+import { getInventoryQuery } from "@/features/inventory/queries/get-inventory-query";
 // import { getProductsQuery } from "@/features/products/queries/get-products-query";
 import { CreateShipmentForm } from "@/features/shipments/components/shipment-form";
 
@@ -21,13 +22,20 @@ export default async function Page() {
   //     getProductsQuery(),
   //   ]);
 
-  const [stores] = await Promise.all([getStoresQuery()]);
+  const [stores, inventory] = await Promise.all([
+    getStoresQuery(),
+    getInventoryQuery(),
+  ]);
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Create Shipment</h1>
 
-      <CreateShipmentForm stores={stores} products={products} />
+      <CreateShipmentForm
+        stores={stores}
+        products={products}
+        inventory={inventory ?? []}
+      />
     </div>
   );
 }

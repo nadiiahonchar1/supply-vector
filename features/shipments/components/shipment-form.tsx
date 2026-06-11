@@ -6,6 +6,13 @@ import { useState } from "react";
 import type { StoreOption } from "@/features/stores/types";
 import { createShipmentAction } from "../actions/create-shipment";
 
+type InventoryItem = {
+  store_id: string;
+  product_id: string;
+  quantity: number;
+  min_stock: number;
+};
+
 type Props = {
   stores: StoreOption[];
   products: {
@@ -13,6 +20,7 @@ type Props = {
     name: string;
     sku: string;
   }[];
+  inventory?: InventoryItem[];
 };
 
 type Item = {
@@ -20,7 +28,11 @@ type Item = {
   quantity: number;
 };
 
-export function CreateShipmentForm({ stores, products }: Props) {
+export function CreateShipmentForm({
+  stores,
+  products,
+  inventory = [],
+}: Props) {
   const router = useRouter();
 
   const [sourceStoreId, setSourceStoreId] = useState("");
@@ -29,6 +41,16 @@ export function CreateShipmentForm({ stores, products }: Props) {
   const [items, setItems] = useState<Item[]>([{ productId: "", quantity: 1 }]);
 
   const [loading, setLoading] = useState(false);
+
+  function getAvailable(productId: string) {
+    if (!sourceStoreId || !inventory.length) return 0;
+
+    const item = inventory.find(
+      (i) => i.store_id === sourceStoreId && i.product_id === productId,
+    );
+
+    return item?.quantity ?? 0;
+  }
 
   function updateItem(index: number, field: keyof Item, value: string) {
     setItems((prev) =>
@@ -70,9 +92,18 @@ export function CreateShipmentForm({ stores, products }: Props) {
       return;
     }
 
-    const productIds = validItems.map((item) => item.productId);
+    // stock validation
+    for (const item of validItems) {
+      const available = getAvailable(item.productId);
 
-    if (new Set(productIds).size !== productIds.length) {
+      if (item.quantity > available) {
+        alert(`Not enough stock for product. Available: ${available}`);
+        return;
+      }
+    }
+
+    const ids = validItems.map((i) => i.productId);
+    if (new Set(ids).size !== ids.length) {
       alert("Duplicate products are not allowed");
       return;
     }
@@ -87,7 +118,6 @@ export function CreateShipmentForm({ stores, products }: Props) {
       });
 
       router.push("/shipments");
-      router.refresh();
     } finally {
       setLoading(false);
     }
@@ -128,41 +158,42 @@ export function CreateShipmentForm({ stores, products }: Props) {
       <div>
         <h3>Items</h3>
 
-        {items.map((item, index) => (
-          <div key={index} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <select
-              value={item.productId}
-              onChange={(e) => updateItem(index, "productId", e.target.value)}
-            >
-              <option value="">Select product</option>
+        {items.map((item, index) => {
+          const available = getAvailable(item.productId);
 
-              {products
-                .filter(
-                  (product) =>
-                    product.id === item.productId ||
-                    !items.some(
-                      (selectedItem) => selectedItem.productId === product.id,
-                    ),
-                )
-                .map((p) => (
+          return (
+            <div key={index} style={{ display: "flex", gap: 8 }}>
+              <select
+                value={item.productId}
+                onChange={(e) => updateItem(index, "productId", e.target.value)}
+                disabled={!sourceStoreId}
+              >
+                <option value="">Select product</option>
+
+                {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.sku})
                   </option>
                 ))}
-            </select>
+              </select>
 
-            <input
-              type="number"
-              min={1}
-              value={item.quantity}
-              onChange={(e) => updateItem(index, "quantity", e.target.value)}
-            />
+              <input
+                type="number"
+                min={1}
+                max={available || 1}
+                value={item.quantity}
+                onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                disabled={!item.productId}
+              />
 
-            <button type="button" onClick={() => removeItem(index)}>
-              Remove
-            </button>
-          </div>
-        ))}
+              <span style={{ fontSize: 12 }}>stock: {available}</span>
+
+              <button type="button" onClick={() => removeItem(index)}>
+                Remove
+              </button>
+            </div>
+          );
+        })}
 
         <button type="button" onClick={addItem}>
           + Add item
