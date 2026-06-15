@@ -96,3 +96,18 @@ CREATE TABLE user_stores (
 
   PRIMARY KEY(user_id, store_id)
 );
+
+CREATE TABLE inventory_movements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  store_id UUID NOT NULL REFERENCES stores(id),
+  product_id UUID NOT NULL REFERENCES products(id),
+
+  quantity_change INTEGER NOT NULL,
+
+  reason TEXT NOT NULL,
+
+  shipment_id UUID REFERENCES shipments(id),
+
+  created_at TIMESTAMP DEFAULT NOW()
+);
