@@ -1,73 +1,151 @@
 import { sql } from "./index";
 
 async function seed() {
+  console.log("🌱 Seeding database...");
+
+  // =========================
+  // ROLES
+  // =========================
+  const roles = await sql`
+    INSERT INTO roles (code, name)
+    VALUES
+      ('admin', 'Admin'),
+      ('manager', 'Manager'),
+      ('viewer', 'Viewer')
+    RETURNING *;
+  `;
+
+  const adminRole = roles.find((r) => r.code === "admin");
+  const managerRole = roles.find((r) => r.code === "manager");
+
+  // =========================
+  // USERS
+  // =========================
+  const users = await sql`
+    INSERT INTO users (
+      email,
+      password_hash,
+      first_name,
+      last_name,
+      is_active
+    )
+    VALUES
+      ('admin@test.com', 'hashed_password', 'Admin', 'User', true),
+      ('manager@test.com', 'hashed_password', 'Manager', 'User', true)
+    RETURNING *;
+  `;
+
+  const adminUser = users[0];
+  const managerUser = users[1];
+
+  // =========================
+  // USER ROLES
+  // =========================
   await sql`
-    TRUNCATE shipment_items, shipments, inventory, products, stores
-    RESTART IDENTITY CASCADE
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES
+      (${adminUser.id}, ${adminRole!.id}),
+      (${managerUser.id}, ${managerRole!.id});
   `;
 
+  // =========================
   // STORES
-  const [kyiv] = await sql`
+  // =========================
+  const stores = await sql`
     INSERT INTO stores (name, city, address)
-    VALUES ('Kyiv Central', 'Kyiv', 'Khreshchatyk 1')
-    RETURNING *
+    VALUES
+      ('Kyiv Central', 'Kyiv', 'Main Street 1'),
+      ('Lviv Hub', 'Lviv', 'Freedom Ave 10')
+    RETURNING *;
   `;
 
-  const [lviv] = await sql`
-    INSERT INTO stores (name, city, address)
-    VALUES ('Lviv Hub', 'Lviv', 'Shevchenka 10')
-    RETURNING *
+  const kyivStore = stores[0];
+  const lvivStore = stores[1];
+
+  // =========================
+  // USER STORES
+  // =========================
+  await sql`
+    INSERT INTO user_stores (user_id, store_id)
+    VALUES
+      (${managerUser.id}, ${kyivStore.id}),
+      (${managerUser.id}, ${lvivStore.id});
   `;
 
+  // =========================
   // PRODUCTS
-  const [iphone] = await sql`
-    INSERT INTO products (name, sku, price)
-    VALUES ('iPhone 15', 'APL-IP15', 999)
-    RETURNING *
+  // =========================
+  const products = await sql`
+    INSERT INTO products (name, sku, price, description, is_active)
+    VALUES
+      ('iPhone 15', 'APL-IP15', 999.99, 'Apple smartphone', true),
+      ('Samsung S24', 'SMS-S24', 899.99, 'Samsung flagship', true),
+      ('MacBook Pro', 'APL-MBP', 1999.99, 'Apple laptop', true)
+    RETURNING *;
   `;
 
-  const [samsung] = await sql`
-    INSERT INTO products (name, sku, price)
-    VALUES ('Samsung S24', 'SMS-S24', 899)
-    RETURNING *
-  `;
-
+  // =========================
   // INVENTORY
+  // =========================
   await sql`
     INSERT INTO inventory (store_id, product_id, quantity, min_stock)
     VALUES
-      (${kyiv.id}, ${iphone.id}, 12, 5),
-      (${kyiv.id}, ${samsung.id}, 3, 5),
-      (${lviv.id}, ${iphone.id}, 2, 5)
+      (${kyivStore.id}, ${products[0].id}, 10, 2),
+      (${kyivStore.id}, ${products[1].id}, 5, 2),
+      (${lvivStore.id}, ${products[2].id}, 3, 1);
   `;
 
+  // =========================
   // SHIPMENTS
-  const [shipment] = await sql`
+  // =========================
+  const shipments = await sql`
     INSERT INTO shipments (
       source_store_id,
       destination_store_id,
-      status
-    )
-    VALUES (
-      ${kyiv.id},
-      ${lviv.id},
-      'pending'
-    )
-    RETURNING *
-  `;
-
-  await sql`
-    INSERT INTO shipment_items (
-      shipment_id,
-      product_id,
-      quantity
+      status,
+      created_by
     )
     VALUES
-      (${shipment.id}, ${iphone.id}, 5),
-      (${shipment.id}, ${samsung.id}, 2)
+      (${kyivStore.id}, ${lvivStore.id}, 'pending', ${adminUser.id})
+    RETURNING *;
   `;
 
-  console.log("Seed completed 🚀");
+  const shipment = shipments[0];
+
+  // =========================
+  // SHIPMENT ITEMS
+  // =========================
+  await sql`
+    INSERT INTO shipment_items (shipment_id, product_id, quantity)
+    VALUES
+      (${shipment.id}, ${products[0].id}, 2),
+      (${shipment.id}, ${products[1].id}, 1);
+  `;
+
+  // =========================
+  // INVENTORY MOVEMENTS (optional seed)
+  // =========================
+  await sql`
+    INSERT INTO inventory_movements (
+      store_id,
+      product_id,
+      quantity_change,
+      reason,
+      shipment_id,
+      created_by
+    )
+    VALUES
+      (${kyivStore.id}, ${products[0].id}, -2, 'seed shipment', ${shipment.id}, ${adminUser.id});
+  `;
+
+  console.log("✅ Seeding completed");
 }
 
-seed();
+seed()
+  .catch((err) => {
+    console.error("❌ Seed error:", err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    process.exit(0);
+  });
