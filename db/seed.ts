@@ -1,4 +1,5 @@
-import { sql } from "./index";
+import { sql } from "@/db";
+import { hashPassword } from "@/lib/auth/password";
 
 async function seed() {
   console.log("🌱 Seeding database...");
@@ -9,18 +10,26 @@ async function seed() {
   const roles = await sql`
     INSERT INTO roles (code, name)
     VALUES
+      ('superadmin', 'Super Admin'),
       ('admin', 'Admin'),
       ('manager', 'Manager'),
       ('viewer', 'Viewer')
     RETURNING *;
   `;
 
+  const superadminRole = roles.find((r) => r.code === "superadmin");
   const adminRole = roles.find((r) => r.code === "admin");
   const managerRole = roles.find((r) => r.code === "manager");
+  const viewerRole = roles.find((r) => r.code === "viewer");
 
   // =========================
   // USERS
   // =========================
+  const superadminPassword = await hashPassword("superadmin123");
+  const adminPassword = await hashPassword("admin123");
+  const managerPassword = await hashPassword("manager123");
+  const viewerPassword = await hashPassword("viewer123");
+
   const users = await sql`
     INSERT INTO users (
       email,
@@ -30,13 +39,41 @@ async function seed() {
       is_active
     )
     VALUES
-      ('admin@test.com', 'hashed_password', 'Admin', 'User', true),
-      ('manager@test.com', 'hashed_password', 'Manager', 'User', true)
+      (
+        'superadmin@test.com',
+        ${superadminPassword},
+        'Super',
+        'Admin',
+        true
+      ),
+      (
+        'admin@test.com',
+        ${adminPassword},
+        'Admin',
+        'User',
+        true
+      ),
+      (
+        'manager@test.com',
+        ${managerPassword},
+        'Manager',
+        'User',
+        true
+      ),
+      (
+        'viewer@test.com',
+        ${viewerPassword},
+        'Viewer',
+        'User',
+        true
+      )
     RETURNING *;
   `;
 
-  const adminUser = users[0];
-  const managerUser = users[1];
+  const superadmin = users.find((u) => u.email === "superadmin@test.com")!;
+  const admin = users.find((u) => u.email === "admin@test.com")!;
+  const manager = users.find((u) => u.email === "manager@test.com")!;
+  const viewer = users.find((u) => u.email === "viewer@test.com")!;
 
   // =========================
   // USER ROLES
@@ -44,8 +81,10 @@ async function seed() {
   await sql`
     INSERT INTO user_roles (user_id, role_id)
     VALUES
-      (${adminUser.id}, ${adminRole!.id}),
-      (${managerUser.id}, ${managerRole!.id});
+      (${superadmin.id}, ${superadminRole!.id}),
+      (${admin.id}, ${adminRole!.id}),
+      (${manager.id}, ${managerRole!.id}),
+      (${viewer.id}, ${viewerRole!.id});
   `;
 
   // =========================
@@ -59,17 +98,20 @@ async function seed() {
     RETURNING *;
   `;
 
-  const kyivStore = stores[0];
-  const lvivStore = stores[1];
+  const kyiv = stores[0];
+  const lviv = stores[1];
 
   // =========================
-  // USER STORES
+  // USER STORES (manager + admin access)
   // =========================
   await sql`
     INSERT INTO user_stores (user_id, store_id)
     VALUES
-      (${managerUser.id}, ${kyivStore.id}),
-      (${managerUser.id}, ${lvivStore.id});
+      (${admin.id}, ${kyiv.id}),
+      (${admin.id}, ${lviv.id}),
+      (${manager.id}, ${kyiv.id}),
+      (${manager.id}, ${lviv.id}),
+      (${viewer.id}, ${kyiv.id});
   `;
 
   // =========================
@@ -90,13 +132,13 @@ async function seed() {
   await sql`
     INSERT INTO inventory (store_id, product_id, quantity, min_stock)
     VALUES
-      (${kyivStore.id}, ${products[0].id}, 10, 2),
-      (${kyivStore.id}, ${products[1].id}, 5, 2),
-      (${lvivStore.id}, ${products[2].id}, 3, 1);
+      (${kyiv.id}, ${products[0].id}, 10, 2),
+      (${kyiv.id}, ${products[1].id}, 5, 2),
+      (${lviv.id}, ${products[2].id}, 3, 1);
   `;
 
   // =========================
-  // SHIPMENTS
+  // SHIPMENT
   // =========================
   const shipments = await sql`
     INSERT INTO shipments (
@@ -106,7 +148,7 @@ async function seed() {
       created_by
     )
     VALUES
-      (${kyivStore.id}, ${lvivStore.id}, 'pending', ${adminUser.id})
+      (${kyiv.id}, ${lviv.id}, 'pending', ${admin.id})
     RETURNING *;
   `;
 
@@ -115,30 +157,40 @@ async function seed() {
   // =========================
   // SHIPMENT ITEMS
   // =========================
-  await sql`
+  const shipmentItems = await sql`
     INSERT INTO shipment_items (shipment_id, product_id, quantity)
     VALUES
       (${shipment.id}, ${products[0].id}, 2),
-      (${shipment.id}, ${products[1].id}, 1);
+      (${shipment.id}, ${products[1].id}, 1)
+    RETURNING *;
   `;
 
   // =========================
-  // INVENTORY MOVEMENTS (optional seed)
+  // INVENTORY MOVEMENTS (initial example)
   // =========================
   await sql`
     INSERT INTO inventory_movements (
       store_id,
       product_id,
       quantity_change,
-      reason,
+      movement_type,
       shipment_id,
+      shipment_item_id,
       created_by
     )
     VALUES
-      (${kyivStore.id}, ${products[0].id}, -2, 'seed shipment', ${shipment.id}, ${adminUser.id});
+      (
+        ${kyiv.id},
+        ${products[0].id},
+        -2,
+        'transfer_out',
+        ${shipment.id},
+        ${shipmentItems[0].id},
+        ${admin.id}
+      );
   `;
 
-  console.log("✅ Seeding completed");
+  console.log("✅ Seed completed successfully");
 }
 
 seed()
@@ -146,6 +198,4 @@ seed()
     console.error("❌ Seed error:", err);
     process.exit(1);
   })
-  .finally(async () => {
-    process.exit(0);
-  });
+  .finally(() => process.exit(0));

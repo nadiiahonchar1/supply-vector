@@ -14,7 +14,6 @@ CREATE TABLE users (
   last_name TEXT NOT NULL,
 
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-
   last_login_at TIMESTAMP,
 
   created_at TIMESTAMP DEFAULT NOW(),
@@ -35,11 +34,13 @@ CREATE TABLE user_roles (
   PRIMARY KEY (user_id, role_id)
 );
 
-CREATE TABLE user_stores (
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  store_id UUID NOT NULL,
+CREATE TABLE password_resets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  PRIMARY KEY (user_id, store_id)
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- =====================================
@@ -59,11 +60,12 @@ CREATE TABLE stores (
   UNIQUE (name, city, address)
 );
 
-ALTER TABLE user_stores
-ADD CONSTRAINT fk_user_stores_store
-FOREIGN KEY (store_id)
-REFERENCES stores(id)
-ON DELETE CASCADE;
+CREATE TABLE user_stores (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+
+  PRIMARY KEY (user_id, store_id)
+);
 
 -- =====================================
 -- PRODUCTS
@@ -74,11 +76,9 @@ CREATE TABLE products (
 
   name TEXT NOT NULL,
   sku TEXT NOT NULL UNIQUE,
-
   price NUMERIC(10,2) NOT NULL,
 
   description TEXT,
-
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
   created_at TIMESTAMP DEFAULT NOW(),
@@ -115,21 +115,13 @@ CREATE TABLE shipments (
   destination_store_id UUID NOT NULL REFERENCES stores(id),
 
   status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (
-      status IN (
-        'pending',
-        'in_transit',
-        'completed',
-        'cancelled'
-      )
-    ),
+    CHECK (status IN ('pending', 'in_transit', 'completed', 'cancelled')),
 
   created_by UUID REFERENCES users(id),
   updated_by UUID REFERENCES users(id),
 
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-
   completed_at TIMESTAMP,
 
   CHECK (source_store_id <> destination_store_id)
@@ -138,39 +130,39 @@ CREATE TABLE shipments (
 CREATE TABLE shipment_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  shipment_id UUID NOT NULL
-    REFERENCES shipments(id)
-    ON DELETE CASCADE,
+  shipment_id UUID NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id),
 
-  product_id UUID NOT NULL
-    REFERENCES products(id),
-
-  quantity INTEGER NOT NULL
-    CHECK (quantity > 0)
+  quantity INTEGER NOT NULL CHECK (quantity > 0)
 );
 
 -- =====================================
--- INVENTORY MOVEMENTS
+-- INVENTORY MOVEMENTS (CRITICAL TABLE)
 -- =====================================
 
 CREATE TABLE inventory_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  store_id UUID NOT NULL
-    REFERENCES stores(id),
-
-  product_id UUID NOT NULL
-    REFERENCES products(id),
+  store_id UUID NOT NULL REFERENCES stores(id),
+  product_id UUID NOT NULL REFERENCES products(id),
 
   quantity_change INTEGER NOT NULL,
 
-  reason TEXT NOT NULL,
+  movement_type TEXT NOT NULL CHECK (
+    movement_type IN (
+      'purchase',
+      'sale',
+      'transfer_in',
+      'transfer_out',
+      'adjustment',
+      'return'
+    )
+  ),
 
-  shipment_id UUID
-    REFERENCES shipments(id),
+  shipment_id UUID REFERENCES shipments(id),
+  shipment_item_id UUID REFERENCES shipment_items(id),
 
-  created_by UUID
-    REFERENCES users(id),
+  created_by UUID REFERENCES users(id),
 
   created_at TIMESTAMP DEFAULT NOW()
 );
