@@ -1,9 +1,15 @@
-export type Role = "super_admin" | "admin" | "manager" | "operator" | "viewer";
+export const ROLES = {
+  SUPER_ADMIN: "superadmin",
+  ADMIN: "admin",
+  MANAGER: "manager",
+  VIEWER: "viewer",
+} as const;
 
-const roleHierarchy: Record<Role, number> = {
-  super_admin: 5,
+export type Role = (typeof ROLES)[keyof typeof ROLES];
+
+export const roleHierarchy: Record<Role, number> = {
+  superadmin: 5,
   admin: 4,
   manager: 3,
-  operator: 2,
   viewer: 1,
 };

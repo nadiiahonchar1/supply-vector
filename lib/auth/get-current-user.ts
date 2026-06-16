@@ -1,11 +1,11 @@
-import { cookies } from "next/headers";
 import { sql } from "@/db";
+import { getSessionFromCookie } from "./session";
+
 
 export async function getCurrentUser() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("session")?.value;
+  const session = await getSessionFromCookie();
 
-  if (!userId) return null;
+  if (!session) return null;
 
   const users = await sql`
     SELECT
@@ -15,7 +15,7 @@ export async function getCurrentUser() {
       last_name,
       is_active
     FROM users
-    WHERE id = ${userId}
+    WHERE id = ${session.user_id}
       AND is_active = true
   `;
 
