@@ -4,9 +4,9 @@ import { hashPassword } from "@/lib/auth/password";
 async function seed() {
   console.log("🌱 Seeding database...");
 
-  // =========================
+  // =====================================
   // ROLES
-  // =========================
+  // =====================================
   const roles = await sql`
     INSERT INTO roles (code, name)
     VALUES
@@ -14,17 +14,20 @@ async function seed() {
       ('admin', 'Admin'),
       ('manager', 'Manager'),
       ('viewer', 'Viewer')
+    ON CONFLICT (code) DO NOTHING
     RETURNING *;
   `;
 
-  const superadminRole = roles.find((r) => r.code === "superadmin");
-  const adminRole = roles.find((r) => r.code === "admin");
-  const managerRole = roles.find((r) => r.code === "manager");
-  const viewerRole = roles.find((r) => r.code === "viewer");
+  const allRoles = await sql`SELECT * FROM roles`;
 
-  // =========================
-  // USERS
-  // =========================
+  const superadminRole = allRoles.find((r) => r.code === "superadmin");
+  const adminRole = allRoles.find((r) => r.code === "admin");
+  const managerRole = allRoles.find((r) => r.code === "manager");
+  const viewerRole = allRoles.find((r) => r.code === "viewer");
+
+  // =====================================
+  // USERS (1 per role)
+  // =====================================
   const superadminPassword = await hashPassword("superadmin123");
   const adminPassword = await hashPassword("admin123");
   const managerPassword = await hashPassword("manager123");
@@ -67,127 +70,84 @@ async function seed() {
         'User',
         true
       )
+    ON CONFLICT (email) DO NOTHING
     RETURNING *;
   `;
 
-  const superadmin = users.find((u) => u.email === "superadmin@test.com")!;
-  const admin = users.find((u) => u.email === "admin@test.com")!;
-  const manager = users.find((u) => u.email === "manager@test.com")!;
-  const viewer = users.find((u) => u.email === "viewer@test.com")!;
+  const allUsers = await sql`SELECT * FROM users`;
 
-  // =========================
+  const superadmin = allUsers.find((u) => u.email === "superadmin@test.com");
+  const admin = allUsers.find((u) => u.email === "admin@test.com");
+  const manager = allUsers.find((u) => u.email === "manager@test.com");
+  const viewer = allUsers.find((u) => u.email === "viewer@test.com");
+
+  // =====================================
   // USER ROLES
-  // =========================
+  // =====================================
   await sql`
     INSERT INTO user_roles (user_id, role_id)
     VALUES
-      (${superadmin.id}, ${superadminRole!.id}),
-      (${admin.id}, ${adminRole!.id}),
-      (${manager.id}, ${managerRole!.id}),
-      (${viewer.id}, ${viewerRole!.id});
+      (${superadmin!.id}, ${superadminRole!.id}),
+      (${admin!.id}, ${adminRole!.id}),
+      (${manager!.id}, ${managerRole!.id}),
+      (${viewer!.id}, ${viewerRole!.id})
+    ON CONFLICT DO NOTHING;
   `;
 
-  // =========================
+  // =====================================
   // STORES
-  // =========================
+  // =====================================
   const stores = await sql`
     INSERT INTO stores (name, city, address)
     VALUES
       ('Kyiv Central', 'Kyiv', 'Main Street 1'),
       ('Lviv Hub', 'Lviv', 'Freedom Ave 10')
+    ON CONFLICT DO NOTHING
     RETURNING *;
   `;
 
-  const kyiv = stores[0];
-  const lviv = stores[1];
+  const allStores = await sql`SELECT * FROM stores`;
 
-  // =========================
-  // USER STORES (manager + admin access)
-  // =========================
+  const kyiv = allStores[0];
+  const lviv = allStores[1];
+
+  // =====================================
+  // USER STORES
+  // =====================================
   await sql`
     INSERT INTO user_stores (user_id, store_id)
     VALUES
-      (${admin.id}, ${kyiv.id}),
-      (${admin.id}, ${lviv.id}),
-      (${manager.id}, ${kyiv.id}),
-      (${manager.id}, ${lviv.id}),
-      (${viewer.id}, ${kyiv.id});
+      (${admin!.id}, ${kyiv.id}),
+      (${manager!.id}, ${kyiv.id}),
+      (${viewer!.id}, ${kyiv.id})
+    ON CONFLICT DO NOTHING;
   `;
 
-  // =========================
+  // =====================================
   // PRODUCTS
-  // =========================
+  // =====================================
   const products = await sql`
     INSERT INTO products (name, sku, price, description, is_active)
     VALUES
       ('iPhone 15', 'APL-IP15', 999.99, 'Apple smartphone', true),
       ('Samsung S24', 'SMS-S24', 899.99, 'Samsung flagship', true),
       ('MacBook Pro', 'APL-MBP', 1999.99, 'Apple laptop', true)
+    ON CONFLICT DO NOTHING
     RETURNING *;
   `;
 
-  // =========================
+  const allProducts = await sql`SELECT * FROM products`;
+
+  // =====================================
   // INVENTORY
-  // =========================
+  // =====================================
   await sql`
     INSERT INTO inventory (store_id, product_id, quantity, min_stock)
     VALUES
-      (${kyiv.id}, ${products[0].id}, 10, 2),
-      (${kyiv.id}, ${products[1].id}, 5, 2),
-      (${lviv.id}, ${products[2].id}, 3, 1);
-  `;
-
-  // =========================
-  // SHIPMENT
-  // =========================
-  const shipments = await sql`
-    INSERT INTO shipments (
-      source_store_id,
-      destination_store_id,
-      status,
-      created_by
-    )
-    VALUES
-      (${kyiv.id}, ${lviv.id}, 'pending', ${admin.id})
-    RETURNING *;
-  `;
-
-  const shipment = shipments[0];
-
-  // =========================
-  // SHIPMENT ITEMS
-  // =========================
-  const shipmentItems = await sql`
-    INSERT INTO shipment_items (shipment_id, product_id, quantity)
-    VALUES
-      (${shipment.id}, ${products[0].id}, 2),
-      (${shipment.id}, ${products[1].id}, 1)
-    RETURNING *;
-  `;
-
-  // =========================
-  // INVENTORY MOVEMENTS (initial example)
-  // =========================
-  await sql`
-    INSERT INTO inventory_movements (
-      store_id,
-      product_id,
-      quantity_change,
-      movement_type,
-      shipment_id,
-      shipment_item_id,
-      created_by
-    )
-    VALUES
-      (
-        ${kyiv.id},
-        ${products[0].id},
-        -2,
-        'transfer_out',
-        ${shipment.id},
-        ${shipmentItems[0].id},
-        ${admin.id}
-      );
+      (${kyiv.id}, ${allProducts[0].id}, 10, 2),
+      (${kyiv.id}, ${allProducts[1].id}, 5, 2),
+      (${lviv.id}, ${allProducts[2].id}, 3, 1)
+    ON CONFLICT DO NOTHING;
   `;
 
   console.log("✅ Seed completed successfully");

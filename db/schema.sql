@@ -14,7 +14,11 @@ CREATE TABLE users (
   last_name TEXT NOT NULL,
 
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
   last_login_at TIMESTAMP,
+
+  created_by UUID REFERENCES users(id),
+  deleted_at TIMESTAMP,
 
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -34,13 +38,48 @@ CREATE TABLE user_roles (
   PRIMARY KEY (user_id, role_id)
 );
 
+CREATE TABLE sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE password_resets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
   token TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMP NOT NULL,
   used BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE password_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  user_id UUID REFERENCES users(id),
+
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id UUID,
+
+  meta JSONB,
+
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- =====================================
@@ -137,7 +176,7 @@ CREATE TABLE shipment_items (
 );
 
 -- =====================================
--- INVENTORY MOVEMENTS (CRITICAL TABLE)
+-- INVENTORY MOVEMENTS
 -- =====================================
 
 CREATE TABLE inventory_movements (
