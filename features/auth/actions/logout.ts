@@ -2,7 +2,16 @@
 
 import { cookies } from "next/headers";
 
+import { logoutUser } from "@/lib/auth/auth-service";
+
 export async function logoutAction() {
-    const cookieStore = await cookies();
-  cookieStore.delete("session");
+  const token = (await cookies()).get("session")?.value;
+
+  if (token) {
+    await logoutUser(token);
+  }
+
+  return {
+    success: true,
+  };
 }
