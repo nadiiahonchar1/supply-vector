@@ -18,6 +18,7 @@ CREATE TABLE users (
   last_login_at TIMESTAMP,
 
   created_by UUID REFERENCES users(id),
+  deleted_by UUID REFERENCES users(id),
   deleted_at TIMESTAMP,
 
   created_at TIMESTAMP DEFAULT NOW(),
@@ -26,7 +27,6 @@ CREATE TABLE users (
 
 CREATE TABLE roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
   code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL
 );
@@ -34,7 +34,6 @@ CREATE TABLE roles (
 CREATE TABLE user_roles (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-
   PRIMARY KEY (user_id, role_id)
 );
 
@@ -46,7 +45,8 @@ CREATE TABLE sessions (
   token TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMP NOT NULL,
 
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  last_used_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE password_resets (
@@ -56,15 +56,15 @@ CREATE TABLE password_resets (
 
   token TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMP NOT NULL,
-  used BOOLEAN NOT NULL DEFAULT FALSE
+  used_at TIMESTAMP
 );
 
 CREATE TABLE password_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
   password_hash TEXT NOT NULL,
+
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -78,6 +78,8 @@ CREATE TABLE audit_logs (
   entity_id UUID,
 
   meta JSONB,
+  ip_address TEXT,
+  user_agent TEXT,
 
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -93,6 +95,9 @@ CREATE TABLE stores (
   city TEXT NOT NULL,
   address TEXT NOT NULL,
 
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
 
@@ -102,7 +107,6 @@ CREATE TABLE stores (
 CREATE TABLE user_stores (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-
   PRIMARY KEY (user_id, store_id)
 );
 
@@ -119,6 +123,9 @@ CREATE TABLE products (
 
   description TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
 
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -150,6 +157,8 @@ CREATE TABLE inventory (
 CREATE TABLE shipments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+  shipment_number TEXT NOT NULL UNIQUE,
+
   source_store_id UUID NOT NULL REFERENCES stores(id),
   destination_store_id UUID NOT NULL REFERENCES stores(id),
 
@@ -165,6 +174,8 @@ CREATE TABLE shipments (
 
   CHECK (source_store_id <> destination_store_id)
 );
+
+CREATE INDEX idx_shipments_status ON shipments(status);
 
 CREATE TABLE shipment_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -186,6 +197,8 @@ CREATE TABLE inventory_movements (
   product_id UUID NOT NULL REFERENCES products(id),
 
   quantity_change INTEGER NOT NULL,
+  quantity_before INTEGER NOT NULL,
+  quantity_after INTEGER NOT NULL,
 
   movement_type TEXT NOT NULL CHECK (
     movement_type IN (
@@ -205,3 +218,7 @@ CREATE TABLE inventory_movements (
 
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX idx_inventory_movements_store_id ON inventory_movements(store_id);
+CREATE INDEX idx_inventory_movements_product_id ON inventory_movements(product_id);
+CREATE INDEX idx_inventory_movements_created_at ON inventory_movements(created_at);
