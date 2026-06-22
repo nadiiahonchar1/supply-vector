@@ -1,0 +1,197 @@
+import { sql } from "@/db";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { requireUser } from "@/lib/auth/auth-service";
+import { Role, canManageRole, getHighestRole } from "@/lib/auth/permissions";
+
+// =====================================================
+// TYPES
+// =====================================================
+
+type CreateUserInput = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: Role;
+  storeIds?: string[];
+};
+
+type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+// =====================================================
+// SERVICE
+// =====================================================
+
+export class UserManagementService {
+  // -------------------------------------
+  // CREATE USER
+  // -------------------------------------
+  static async createUser(input: CreateUserInput) {
+    const currentUser = await requireUser();
+
+    const currentRoles = currentUser.roles;
+    const currentRole = getHighestRole(currentRoles);
+
+    if (!canManageRole(currentRole, input.role)) {
+      throw new Error("Forbidden");
+    }
+
+    const existing = await sql`
+      SELECT id FROM users WHERE email = ${input.email} LIMIT 1
+    `;
+
+    if (existing.length) {
+      throw new Error("User already exists");
+    }
+
+    const passwordHash = await hashPassword(input.password);
+
+    const users = await sql`
+      INSERT INTO users (
+        email,
+        password_hash,
+        first_name,
+        last_name,
+        is_active,
+        created_by
+      )
+      VALUES (
+        ${input.email},
+        ${passwordHash},
+        ${input.firstName},
+        ${input.lastName},
+        true,
+        ${currentUser.id}
+      )
+      RETURNING id
+    `;
+
+    const userId = users[0].id;
+
+    const roleRow = await sql`
+      SELECT id FROM roles WHERE code = ${input.role} LIMIT 1
+    `;
+
+    if (!roleRow.length) {
+      throw new Error("Role not found");
+    }
+
+    await sql`
+      INSERT INTO user_roles (user_id, role_id)
+      VALUES (${userId}, ${roleRow[0].id})
+    `;
+
+    if (input.storeIds?.length) {
+      for (const storeId of input.storeIds) {
+        await sql`
+          INSERT INTO user_stores (user_id, store_id)
+          VALUES (${userId}, ${storeId})
+        `;
+      }
+    }
+
+    return { userId };
+  }
+
+  // -------------------------------------
+  // DELETE USER (soft delete)
+  // -------------------------------------
+  static async deleteUser(targetUserId: string) {
+    const currentUser = await requireUser();
+
+    if (currentUser.id === targetUserId) {
+      throw new Error("You cannot delete yourself");
+    }
+
+    const currentRole = getHighestRole(currentUser.roles);
+
+    const targetRoleRow = await sql`
+      SELECT r.code
+      FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ${targetUserId}
+      LIMIT 1
+    `;
+
+    if (!targetRoleRow.length) {
+      throw new Error("Target role not found");
+    }
+
+    const targetRole = targetRoleRow[0].code as Role;
+
+    if (!canManageRole(currentRole, targetRole)) {
+      throw new Error("Forbidden");
+    }
+
+    const result = await sql`
+      UPDATE users
+      SET
+        is_active = false,
+        deleted_at = NOW(),
+        deleted_by = ${currentUser.id},
+        updated_at = NOW()
+      WHERE id = ${targetUserId}
+        AND is_active = true
+      RETURNING id
+    `;
+
+    if (!result.length) {
+      throw new Error("User not found");
+    }
+
+    return { success: true };
+  }
+
+  // -------------------------------------
+  // CHANGE PASSWORD
+  // -------------------------------------
+  static async changePassword(input: ChangePasswordInput) {
+    const currentUser = await requireUser();
+
+    const userRows = await sql`
+      SELECT password_hash
+      FROM users
+      WHERE id = ${currentUser.id}
+      LIMIT 1
+    `;
+
+    const user = userRows[0];
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const isValid = await verifyPassword(
+      input.currentPassword,
+      user.password_hash,
+    );
+
+    if (!isValid) {
+      throw new Error("Current password is incorrect");
+    }
+
+    const isSame = await verifyPassword(input.newPassword, user.password_hash);
+
+    if (isSame) {
+      throw new Error("New password must be different");
+    }
+
+    const newHash = await hashPassword(input.newPassword);
+
+    await sql`
+      UPDATE users
+      SET password_hash = ${newHash}, updated_at = NOW()
+      WHERE id = ${currentUser.id}
+    `;
+
+    await sql`
+      INSERT INTO password_history (user_id, password_hash)
+      VALUES (${currentUser.id}, ${newHash})
+    `;
+
+    return { success: true };
+  }
+}
