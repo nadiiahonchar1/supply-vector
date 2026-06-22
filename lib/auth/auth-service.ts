@@ -60,11 +60,14 @@ export async function logoutUser(token: string) {
 export async function requireUser() {
   const user = await getCurrentUser();
 
-  if (!user) {
-    throw new Error("Unauthorized");
-  }
+  if (!user) throw new Error("Unauthorized");
 
-  return user;
+  const roles = await getUserRoles(user.id);
+
+  return {
+    ...user,
+    roles,
+  };
 }
 
 // =====================================
@@ -90,4 +93,15 @@ export function requirePermission(role: Role, permission: Permission) {
   if (!allowed) {
     throw new Error("Forbidden");
   }
+}
+
+export async function getUserRoles(userId: string): Promise<Role[]> {
+  const rows = await sql`
+    SELECT r.code
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = ${userId}
+  `;
+
+  return rows.map((r) => r.code as Role);
 }

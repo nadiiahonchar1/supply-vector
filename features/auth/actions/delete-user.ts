@@ -3,9 +3,8 @@
 import { sql } from "@/db";
 
 import { requireUser } from "@/lib/auth/auth-service";
-import { canManageRole } from "@/lib/auth/permissions";
-
-import { getUserRoleQuery } from "../queries/get-user-role-query";
+import { canManageRole, getHighestRole } from "@/lib/auth/permissions";
+import { Role } from "@/lib/auth/permissions";
 
 type DeleteUserInput = {
   userId: string;
@@ -18,17 +17,23 @@ export async function deleteUserAction({ userId }: DeleteUserInput) {
     throw new Error("You cannot delete yourself");
   }
 
-  const currentRole = await getUserRoleQuery(currentUser.id);
+  const currentRoles = currentUser.roles;
+  const currentRole = getHighestRole(currentRoles);
 
-  if (!currentRole) {
-    throw new Error("Current user role not found");
-  }
+  const targetRolesRows = await sql`
+    SELECT r.code
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = ${userId}
+  `;
 
-  const targetRole = await getUserRoleQuery(userId);
+  const targetRoles = targetRolesRows.map((r) => r.code as Role);
 
-  if (!targetRole) {
+  if (!targetRoles.length) {
     throw new Error("Target user role not found");
   }
+
+  const targetRole = getHighestRole(targetRoles);
 
   if (!canManageRole(currentRole, targetRole)) {
     throw new Error("Forbidden");
@@ -50,7 +55,5 @@ export async function deleteUserAction({ userId }: DeleteUserInput) {
     throw new Error("User not found");
   }
 
-  return {
-    success: true,
-  };
+  return { success: true };
 }

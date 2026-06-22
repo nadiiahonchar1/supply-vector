@@ -1,7 +1,6 @@
 "use server";
 
 import { sql } from "@/db";
-
 import { requireUser } from "@/lib/auth/auth-service";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 
@@ -17,8 +16,7 @@ export async function changePasswordAction({
   const currentUser = await requireUser();
 
   const users = await sql`
-    SELECT
-      password_hash
+    SELECT password_hash
     FROM users
     WHERE id = ${currentUser.id}
     LIMIT 1
@@ -46,24 +44,15 @@ export async function changePasswordAction({
 
   await sql`
     UPDATE users
-    SET
-      password_hash = ${newPasswordHash},
-      updated_at = NOW()
+    SET password_hash = ${newPasswordHash},
+        updated_at = NOW()
     WHERE id = ${currentUser.id}
   `;
 
   await sql`
-    INSERT INTO password_history (
-      user_id,
-      password_hash
-    )
-    VALUES (
-      ${currentUser.id},
-      ${newPasswordHash}
-    )
+    INSERT INTO password_history (user_id, password_hash)
+    VALUES (${currentUser.id}, ${newPasswordHash})
   `;
 
-  return {
-    success: true,
-  };
+  return { success: true };
 }

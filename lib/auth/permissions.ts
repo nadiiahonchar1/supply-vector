@@ -8,7 +8,7 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 // =====================================
-// ROLE HIERARCHY (для швидких перевірок)
+// ROLE HIERARCHY
 // =====================================
 export const roleHierarchy: Record<Role, number> = {
   superadmin: 4,
@@ -18,7 +18,7 @@ export const roleHierarchy: Record<Role, number> = {
 };
 
 // =====================================
-// PERMISSIONS (ключова частина)
+// PERMISSIONS
 // =====================================
 export const PERMISSIONS = {
   // USERS
@@ -116,4 +116,8 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
 
 export function canManageRole(currentRole: Role, targetRole: Role): boolean {
   return roleHierarchy[currentRole] > roleHierarchy[targetRole];
+}
+
+export function getHighestRole(roles: Role[]): Role {
+  return roles.sort((a, b) => roleHierarchy[b] - roleHierarchy[a])[0];
 }

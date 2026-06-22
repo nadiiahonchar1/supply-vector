@@ -4,19 +4,14 @@ import { sql } from "@/db";
 
 import { requireUser } from "@/lib/auth/auth-service";
 import { hashPassword } from "@/lib/auth/password";
-import { canManageRole, Role } from "@/lib/auth/permissions";
-
-import { getUserRoleQuery } from "../queries/get-user-role-query";
+import { canManageRole, Role, getHighestRole } from "@/lib/auth/permissions";
 
 type CreateUserInput = {
   email: string;
   password: string;
-
   firstName: string;
   lastName: string;
-
   role: Role;
-
   storeIds?: string[];
 };
 
@@ -30,21 +25,14 @@ export async function createUserAction({
 }: CreateUserInput) {
   const currentUser = await requireUser();
 
-  const currentRole = await getUserRoleQuery(currentUser.id);
-
-  if (!currentRole) {
-    throw new Error("Current user role not found");
-  }
+  const currentRole = getHighestRole(currentUser.roles);
 
   if (!canManageRole(currentRole, role)) {
     throw new Error("Forbidden");
   }
 
   const existingUsers = await sql`
-    SELECT id
-    FROM users
-    WHERE email = ${email}
-    LIMIT 1
+    SELECT id FROM users WHERE email = ${email} LIMIT 1
   `;
 
   if (existingUsers.length) {
@@ -76,10 +64,7 @@ export async function createUserAction({
   const userId = users[0].id;
 
   const roles = await sql`
-    SELECT id
-    FROM roles
-    WHERE code = ${role}
-    LIMIT 1
+    SELECT id FROM roles WHERE code = ${role} LIMIT 1
   `;
 
   const roleId = roles[0]?.id;
@@ -89,32 +74,18 @@ export async function createUserAction({
   }
 
   await sql`
-    INSERT INTO user_roles (
-      user_id,
-      role_id
-    )
-    VALUES (
-      ${userId},
-      ${roleId}
-    )
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (${userId}, ${roleId})
   `;
 
   if (storeIds.length) {
     for (const storeId of storeIds) {
       await sql`
-        INSERT INTO user_stores (
-          user_id,
-          store_id
-        )
-        VALUES (
-          ${userId},
-          ${storeId}
-        )
+        INSERT INTO user_stores (user_id, store_id)
+        VALUES (${userId}, ${storeId})
       `;
     }
   }
 
-  return {
-    userId,
-  };
+  return { userId };
 }

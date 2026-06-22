@@ -40,6 +40,8 @@ export async function getSession(token?: string) {
     JOIN users u ON u.id = s.user_id
     WHERE s.token = ${token}
     LIMIT 1
+    WHERE s.token = ${token}
+    AND s.expires_at > NOW()
   `;
 
   const session = sessions[0];
