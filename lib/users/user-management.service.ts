@@ -1,6 +1,5 @@
 import { sql } from "@/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { requireUser } from "@/lib/auth/auth-service";
 import { Role, canManageRole, getHighestRole } from "@/lib/auth/permissions";
 
 // =====================================================
@@ -29,11 +28,16 @@ export class UserManagementService {
   // -------------------------------------
   // CREATE USER
   // -------------------------------------
-  static async createUser(input: CreateUserInput) {
-    const currentUser = await requireUser();
+  static async createUser(currentUserId: string, input: CreateUserInput) {
+    const currentRoles = await sql`
+      SELECT r.code
+      FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ${currentUserId}
+    `;
 
-    const currentRoles = currentUser.roles;
-    const currentRole = getHighestRole(currentRoles);
+    const roles = currentRoles.map((r) => r.code as Role);
+    const currentRole = getHighestRole(roles);
 
     if (!canManageRole(currentRole, input.role)) {
       throw new Error("Forbidden");
@@ -64,7 +68,7 @@ export class UserManagementService {
         ${input.firstName},
         ${input.lastName},
         true,
-        ${currentUser.id}
+        ${currentUserId}
       )
       RETURNING id
     `;
@@ -97,30 +101,34 @@ export class UserManagementService {
   }
 
   // -------------------------------------
-  // DELETE USER (soft delete)
+  // DELETE USER
   // -------------------------------------
-  static async deleteUser(targetUserId: string) {
-    const currentUser = await requireUser();
-
-    if (currentUser.id === targetUserId) {
+  static async deleteUser(currentUserId: string, targetUserId: string) {
+    if (currentUserId === targetUserId) {
       throw new Error("You cannot delete yourself");
     }
 
-    const currentRole = getHighestRole(currentUser.roles);
+    const currentRoles = await sql`
+      SELECT r.code
+      FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ${currentUserId}
+    `;
 
-    const targetRoleRow = await sql`
+    const targetRoles = await sql`
       SELECT r.code
       FROM user_roles ur
       JOIN roles r ON r.id = ur.role_id
       WHERE ur.user_id = ${targetUserId}
-      LIMIT 1
     `;
 
-    if (!targetRoleRow.length) {
+    if (!targetRoles.length) {
       throw new Error("Target role not found");
     }
 
-    const targetRole = targetRoleRow[0].code as Role;
+    const currentRole = getHighestRole(currentRoles.map((r) => r.code as Role));
+
+    const targetRole = getHighestRole(targetRoles.map((r) => r.code as Role));
 
     if (!canManageRole(currentRole, targetRole)) {
       throw new Error("Forbidden");
@@ -131,7 +139,7 @@ export class UserManagementService {
       SET
         is_active = false,
         deleted_at = NOW(),
-        deleted_by = ${currentUser.id},
+        deleted_by = ${currentUserId},
         updated_at = NOW()
       WHERE id = ${targetUserId}
         AND is_active = true
@@ -148,13 +156,11 @@ export class UserManagementService {
   // -------------------------------------
   // CHANGE PASSWORD
   // -------------------------------------
-  static async changePassword(input: ChangePasswordInput) {
-    const currentUser = await requireUser();
-
+  static async changePassword(userId: string, input: ChangePasswordInput) {
     const userRows = await sql`
       SELECT password_hash
       FROM users
-      WHERE id = ${currentUser.id}
+      WHERE id = ${userId}
       LIMIT 1
     `;
 
@@ -184,12 +190,12 @@ export class UserManagementService {
     await sql`
       UPDATE users
       SET password_hash = ${newHash}, updated_at = NOW()
-      WHERE id = ${currentUser.id}
+      WHERE id = ${userId}
     `;
 
     await sql`
       INSERT INTO password_history (user_id, password_hash)
-      VALUES (${currentUser.id}, ${newHash})
+      VALUES (${userId}, ${newHash})
     `;
 
     return { success: true };
