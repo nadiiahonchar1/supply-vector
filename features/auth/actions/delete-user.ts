@@ -11,7 +11,7 @@ type DeleteUserInput = {
 export async function deleteUserAction({ userId }: DeleteUserInput) {
   const currentUser = await requireUser();
 
-  await UserManagementService.deleteUser(currentUser.id, userId);
+  await UserManagementService.deleteUser(currentUser, userId);
 
   await AuditService.log({
     userId: currentUser.id,

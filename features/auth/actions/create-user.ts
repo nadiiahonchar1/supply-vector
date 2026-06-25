@@ -17,7 +17,7 @@ type CreateUserInput = {
 export async function createUserAction(input: CreateUserInput) {
   const currentUser = await requireUser();
 
-  const result = await UserManagementService.createUser(currentUser.id, input);
+  const result = await UserManagementService.createUser(currentUser, input);
 
   await AuditService.log({
     userId: currentUser.id,
@@ -30,5 +30,8 @@ export async function createUserAction(input: CreateUserInput) {
     },
   });
 
-  return { success: true, userId: result.userId };
+  return {
+    success: true,
+    userId: result.userId,
+  };
 }

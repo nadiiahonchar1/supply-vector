@@ -12,7 +12,7 @@ type ChangePasswordInput = {
 export async function changePasswordAction(input: ChangePasswordInput) {
   const currentUser = await requireUser();
 
-  await UserManagementService.changePassword(currentUser.id, input);
+  await UserManagementService.changePassword(currentUser, input);
 
   await AuditService.log({
     userId: currentUser.id,

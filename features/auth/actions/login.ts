@@ -9,12 +9,13 @@ type LoginInput = {
 };
 
 export async function loginAction({ email, password }: LoginInput) {
-  await loginUser(email, password);
+  const result = await loginUser(email, password);
+
   await AuditService.log({
-    userId: user.id,
+    userId: result.userId,
     action: "auth:login",
     entity: "auth",
-    entityId: user.id,
+    entityId: result.userId,
   });
 
   return {
