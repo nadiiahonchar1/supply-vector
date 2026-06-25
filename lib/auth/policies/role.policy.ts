@@ -8,8 +8,8 @@ export type AuthUser = {
 
 export class RolePolicy {
   static canAssignRole(current: AuthUser, targetRole: Role) {
-    const currentRole = getHighestRole(current.roles);
-    return canManageRole(currentRole, targetRole);
+    const actorRole = getHighestRole(current.roles);
+    return canManageRole(actorRole, targetRole);
   }
 
   static canChangeUserRole(
@@ -19,20 +19,15 @@ export class RolePolicy {
   ) {
     const actorRole = getHighestRole(current.roles);
 
-    if (!canManageRole(actorRole, targetRole)) {
-      return false;
-    }
-
-    if (!canManageRole(actorRole, currentUserRole)) {
-      return false;
-    }
-
-    return true;
+    return (
+      canManageRole(actorRole, currentUserRole) &&
+      canManageRole(actorRole, targetRole)
+    );
   }
 
-  static canDeleteRole(current: AuthUser) {
-    const role = getHighestRole(current.roles);
+  static canDeleteUser(current: AuthUser, targetRole: Role) {
+    const actorRole = getHighestRole(current.roles);
 
-    return role === "superadmin";
+    return canManageRole(actorRole, targetRole);
   }
 }

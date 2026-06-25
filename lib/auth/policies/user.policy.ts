@@ -1,28 +1,19 @@
-import { Role } from "@/lib/auth/permissions";
-import { getHighestRole, canManageRole } from "@/lib/auth/permissions";
+import { Role, canManageRole } from "@/lib/auth/permissions";
 
 export type AuthUser = {
   id: string;
-  roles: Role[];
+  role: Role;
 };
 
 export class UserPolicy {
   static canCreate(current: AuthUser, targetRole: Role) {
-    const currentRole = getHighestRole(current.roles);
-    return canManageRole(currentRole, targetRole);
+    return canManageRole(current.role, targetRole);
   }
 
-  static canDelete(
-    current: AuthUser,
-    targetUser: { id: string; roles: Role[] },
-  ) {
-    const currentRole = getHighestRole(current.roles);
-    const targetRole = getHighestRole(targetUser.roles);
-
-    // self delete protection
+  static canDelete(current: AuthUser, targetUser: { id: string; role: Role }) {
     if (current.id === targetUser.id) return false;
 
-    return canManageRole(currentRole, targetRole);
+    return canManageRole(current.role, targetUser.role);
   }
 
   static canChangePassword(current: AuthUser, targetUserId: string) {
