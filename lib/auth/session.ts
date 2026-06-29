@@ -1,12 +1,14 @@
 import { sql } from "@/db";
 import { cookies } from "next/headers";
-import { randomUUID } from "crypto";
 
 const SESSION_COOKIE = "session";
 const SESSION_LIFETIME_DAYS = 7;
 
+// =====================================
+// CREATE SESSION
+// =====================================
 export async function createSession(userId: string) {
-  const token = randomUUID();
+  const token = crypto.randomUUID();
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_LIFETIME_DAYS);
@@ -16,7 +18,9 @@ export async function createSession(userId: string) {
     VALUES (${userId}, ${token}, ${expiresAt})
   `;
 
-  (await cookies()).set(SESSION_COOKIE, token, {
+  const cookieStore = await cookies();
+
+  cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -27,6 +31,9 @@ export async function createSession(userId: string) {
   return token;
 }
 
+// =====================================
+// GET SESSION (FIXED SQL)
+// =====================================
 export async function getSession(token?: string) {
   if (!token) return null;
 
@@ -39,29 +46,34 @@ export async function getSession(token?: string) {
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token = ${token}
+      AND s.expires_at > NOW()
     LIMIT 1
-    WHERE s.token = ${token}
-    AND s.expires_at > NOW()
   `;
 
   const session = sessions[0];
 
   if (!session) return null;
   if (!session.is_active) return null;
-  if (new Date(session.expires_at) < new Date()) return null;
 
   return session;
 }
 
+// =====================================
+// DELETE SESSION
+// =====================================
 export async function deleteSession(token: string) {
   await sql`
     DELETE FROM sessions
     WHERE token = ${token}
   `;
 
-  (await cookies()).delete(SESSION_COOKIE);
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE);
 }
 
+// =====================================
+// GET SESSION FROM COOKIE
+// =====================================
 export async function getSessionFromCookie() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

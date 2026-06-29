@@ -4,10 +4,13 @@ import { getSession } from "@/lib/auth/session";
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get("session")?.value;
+  const { pathname } = req.nextUrl;
 
-  const isLoginPage = req.nextUrl.pathname === "/login";
+  const isLoginPage = pathname === "/login";
 
-  if (isLoginPage) return NextResponse.next();
+  if (isLoginPage) {
+    return NextResponse.next();
+  }
 
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
