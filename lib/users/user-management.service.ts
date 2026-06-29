@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { Role, canManageRole, getHighestRole } from "@/lib/auth/permissions";
+import { Role, canManageRole } from "@/lib/auth/permissions";
 
 // =====================================================
 // TYPES
@@ -8,7 +8,7 @@ import { Role, canManageRole, getHighestRole } from "@/lib/auth/permissions";
 
 type CurrentUser = {
   id: string;
-  roles: Role[];
+  role: Role;
 };
 
 type CreateUserInput = {
@@ -34,9 +34,8 @@ export class UserManagementService {
   // CREATE USER
   // -------------------------------------
   static async createUser(currentUser: CurrentUser, input: CreateUserInput) {
-    const currentRole = getHighestRole(currentUser.roles);
 
-    if (!canManageRole(currentRole, input.role)) {
+    if (!canManageRole(currentUser.role, input.role)) {
       throw new Error("Forbidden");
     }
 
@@ -105,8 +104,6 @@ export class UserManagementService {
       throw new Error("You cannot delete yourself");
     }
 
-    const currentRole = getHighestRole(currentUser.roles);
-
     const targetRoleRow = await sql`
       SELECT r.code
       FROM user_roles ur
@@ -121,7 +118,7 @@ export class UserManagementService {
 
     const targetRole = targetRoleRow[0].code as Role;
 
-    if (!canManageRole(currentRole, targetRole)) {
+    if (!canManageRole(currentUser.role, targetRole)) {
       throw new Error("Forbidden");
     }
 

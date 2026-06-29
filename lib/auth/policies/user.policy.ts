@@ -10,8 +10,16 @@ export class UserPolicy {
     return canManageRole(current.role, targetRole);
   }
 
-  static canDelete(current: AuthUser, targetUser: { id: string; role: Role }) {
-    if (current.id === targetUser.id) return false;
+  static canDelete(
+    current: AuthUser,
+    targetUser: {
+      id: string;
+      role: Role;
+    },
+  ) {
+    if (current.id === targetUser.id) {
+      return false;
+    }
 
     return canManageRole(current.role, targetUser.role);
   }

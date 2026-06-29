@@ -106,18 +106,10 @@ export function hasPermission(role: Role, permission: Permission): boolean {
   return rolePermissions[role]?.includes(permission) ?? false;
 }
 
-export function canAccess(userRoles: Role[], permission: Permission): boolean {
-  return userRoles.some((role) => hasPermission(role, permission));
-}
-
 export function hasMinRole(userRole: Role, minRole: Role): boolean {
   return roleHierarchy[userRole] >= roleHierarchy[minRole];
 }
 
 export function canManageRole(currentRole: Role, targetRole: Role): boolean {
   return roleHierarchy[currentRole] > roleHierarchy[targetRole];
-}
-
-export function getHighestRole(roles: Role[]): Role {
-  return roles.sort((a, b) => roleHierarchy[b] - roleHierarchy[a])[0];
 }
