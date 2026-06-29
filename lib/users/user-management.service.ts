@@ -1,6 +1,7 @@
 import { sql } from "@/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { Role, canManageRole } from "@/lib/auth/permissions";
+import { UserPolicy } from "@/lib/auth/policies";
 
 // =====================================================
 // TYPES
@@ -34,7 +35,6 @@ export class UserManagementService {
   // CREATE USER
   // -------------------------------------
   static async createUser(currentUser: CurrentUser, input: CreateUserInput) {
-
     if (!canManageRole(currentUser.role, input.role)) {
       throw new Error("Forbidden");
     }
@@ -105,34 +105,36 @@ export class UserManagementService {
     }
 
     const targetRoleRow = await sql`
-      SELECT r.code
-      FROM user_roles ur
-      JOIN roles r ON r.id = ur.role_id
-      WHERE ur.user_id = ${targetUserId}
-      LIMIT 1
-    `;
+    SELECT r.code
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = ${targetUserId}
+    LIMIT 1
+  `;
 
     if (!targetRoleRow.length) {
       throw new Error("Target role not found");
     }
 
-    const targetRole = targetRoleRow[0].code as Role;
+    const targetRole = targetRoleRow[0].code;
 
-    if (!canManageRole(currentUser.role, targetRole)) {
+    const { UserPolicy } = await import("@/lib/auth/policies");
+
+    if (!UserPolicy.canDeleteUser(currentUser.role, targetRole)) {
       throw new Error("Forbidden");
     }
 
     const result = await sql`
-      UPDATE users
-      SET
-        is_active = false,
-        deleted_at = NOW(),
-        deleted_by = ${currentUser.id},
-        updated_at = NOW()
-      WHERE id = ${targetUserId}
-        AND is_active = true
-      RETURNING id
-    `;
+    UPDATE users
+    SET
+      is_active = false,
+      deleted_at = NOW(),
+      deleted_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${targetUserId}
+      AND is_active = true
+    RETURNING id
+  `;
 
     if (!result.length) {
       throw new Error("User not found");
@@ -140,7 +142,6 @@ export class UserManagementService {
 
     return { success: true };
   }
-
   // -------------------------------------
   // CHANGE PASSWORD
   // -------------------------------------
@@ -190,5 +191,46 @@ export class UserManagementService {
     `;
 
     return { success: true };
+  }
+
+  static async listUsers(currentUser: CurrentUser) {
+    if (!UserPolicy.canViewUsers(currentUser.role)) {
+      throw new Error("Forbidden");
+    }
+
+    return await sql`
+    SELECT
+      id,
+      email,
+      first_name,
+      last_name,
+      is_active,
+      created_at
+    FROM users
+    WHERE is_active = true
+    ORDER BY created_at DESC
+  `;
+  }
+
+  static async getUserById(currentUser: CurrentUser, userId: string) {
+    const user = await sql`
+    SELECT
+      id,
+      email,
+      first_name,
+      last_name,
+      is_active,
+      created_at
+    FROM users
+    WHERE id = ${userId}
+      AND is_active = true
+    LIMIT 1
+  `;
+
+    if (!user.length) {
+      throw new Error("User not found");
+    }
+
+    return user[0];
   }
 }

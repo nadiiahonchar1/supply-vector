@@ -1,30 +1,19 @@
-import { Role, canManageRole } from "@/lib/auth/permissions";
-
-export type AuthUser = {
-  id: string;
-  role: Role;
-};
+import { Role, canManageRole, roleHierarchy } from "@/lib/auth/permissions";
 
 export class UserPolicy {
-  static canCreate(current: AuthUser, targetRole: Role) {
-    return canManageRole(current.role, targetRole);
+  static canViewUsers(role: Role) {
+    return roleHierarchy[role] >= roleHierarchy.manager;
   }
 
-  static canDelete(
-    current: AuthUser,
-    targetUser: {
-      id: string;
-      role: Role;
-    },
-  ) {
-    if (current.id === targetUser.id) {
-      return false;
-    }
-
-    return canManageRole(current.role, targetUser.role);
+  static canCreateUser(role: Role) {
+    return roleHierarchy[role] >= roleHierarchy.admin;
   }
 
-  static canChangePassword(current: AuthUser, targetUserId: string) {
-    return current.id === targetUserId;
+  static canDeleteUser(role: Role, targetRole: Role) {
+    return canManageRole(role, targetRole);
+  }
+
+  static canChangePassword(userId: string, targetUserId: string) {
+    return userId === targetUserId;
   }
 }

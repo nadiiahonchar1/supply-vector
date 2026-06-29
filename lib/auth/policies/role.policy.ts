@@ -1,5 +1,4 @@
-import { Role } from "@/lib/auth/permissions";
-import { canManageRole } from "@/lib/auth/permissions";
+import { Role, canManageRole } from "@/lib/auth/permissions";
 
 export type AuthUser = {
   id: string;
