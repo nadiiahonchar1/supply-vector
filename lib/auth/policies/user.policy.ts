@@ -1,4 +1,5 @@
-import { Role, canManageRole, roleHierarchy } from "@/lib/auth/permissions";
+import { canManageRole, roleHierarchy } from "@/lib/auth/permissions";
+import type { Role } from "@/features/auth/types";
 
 export class UserPolicy {
   static canViewUsers(role: Role) {

@@ -1,30 +1,9 @@
 import { sql } from "@/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { Role, canManageRole } from "@/lib/auth/permissions";
+import { canManageRole } from "@/lib/auth/permissions";
 import { UserPolicy } from "@/lib/auth/policies";
 
-// =====================================================
-// TYPES
-// =====================================================
-
-type CurrentUser = {
-  id: string;
-  role: Role;
-};
-
-type CreateUserInput = {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  role: Role;
-  storeIds?: string[];
-};
-
-type ChangePasswordInput = {
-  currentPassword: string;
-  newPassword: string;
-};
+import { CurrentUser, CreateUserInput, ChangePasswordInput } from "@/features/auth/types";
 
 // =====================================================
 // SERVICE

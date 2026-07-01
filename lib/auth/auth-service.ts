@@ -3,7 +3,8 @@ import { sql } from "@/db";
 import { verifyPassword } from "./password";
 import { createSession, deleteSession } from "./session";
 import { getCurrentUser } from "./get-current-user";
-import { Role, rolePermissions, Permission } from "./permissions";
+import {rolePermissions} from "./permissions";
+import type { Role, Permission } from "@/features/auth/types";
 
 // =====================================
 // LOGIN

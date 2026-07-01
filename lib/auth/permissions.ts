@@ -1,11 +1,11 @@
+import type { Role, Permission } from "@/features/auth/types";
+
 export const ROLES = {
   SUPER_ADMIN: "superadmin",
   ADMIN: "admin",
   MANAGER: "manager",
   VIEWER: "viewer",
 } as const;
-
-export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 // =====================================
 // ROLE HIERARCHY
@@ -44,8 +44,6 @@ export const PERMISSIONS = {
   SHIPMENT_CANCEL: "shipment:cancel",
   SHIPMENT_VIEW: "shipment:view",
 } as const;
-
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 // =====================================
 // ROLE → PERMISSIONS MAP

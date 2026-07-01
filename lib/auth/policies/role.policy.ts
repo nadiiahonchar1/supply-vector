@@ -1,9 +1,5 @@
-import { Role, canManageRole } from "@/lib/auth/permissions";
-
-export type AuthUser = {
-  id: string;
-  role: Role;
-};
+import type { Role, AuthUser } from "@/features/auth/types";
+import { canManageRole } from "../permissions";
 
 export class RolePolicy {
   static canAssignRole(current: AuthUser, targetRole: Role) {

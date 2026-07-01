@@ -1,16 +1,6 @@
 import { sql } from "@/db";
-
-import { Role } from "./permissions";
 import { getSessionFromCookie } from "./session";
-
-export type CurrentUser = {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  is_active: boolean;
-  role: Role;
-};
+import type { CurrentUser} from "@/features/auth/types";
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await getSessionFromCookie();

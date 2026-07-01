@@ -2,11 +2,7 @@
 
 import { loginUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
-
-type LoginInput = {
-  email: string;
-  password: string;
-};
+import type { LoginInput } from "../types";
 
 export async function loginAction({ email, password }: LoginInput) {
   const result = await loginUser(email, password);
