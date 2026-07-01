@@ -3,7 +3,8 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { canManageRole } from "@/lib/auth/permissions";
 import { UserPolicy } from "@/lib/auth/policies";
 
-import { CurrentUser, CreateUserInput, ChangePasswordInput } from "@/features/auth/types";
+import { CurrentUser, ChangePasswordInput } from "@/features/auth/types";
+import { CreateUserInput } from "@/features/users/type";
 
 // =====================================================
 // SERVICE

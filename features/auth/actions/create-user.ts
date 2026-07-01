@@ -3,7 +3,7 @@
 import { requireUser } from "@/lib/auth/auth-service";
 import { UserManagementService } from "@/lib/users/user-management.service";
 import { AuditService } from "@/lib/audit/audit.service";
-import type { CreateUserInput } from "../types";                                                
+import type { CreateUserInput } from "@/features/users/type";                                            
 
 export async function createUserAction(input: CreateUserInput) {
   const currentUser = await requireUser();

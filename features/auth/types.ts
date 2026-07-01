@@ -1,24 +1,12 @@
-import { ROLES, PERMISSIONS } from "@/lib/auth/permissions";
+import { PERMISSIONS, ROLES } from "@/lib/auth/permissions";
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
-export type ChangePasswordInput = {
-  currentPassword: string;
-  newPassword: string;
-};
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-export type CreateUserInput = {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  role: Role;
-  storeIds?: string[];
-};
-
-export type DeleteUserInput = {
-  userId: string;
-};
+// =====================================
+// AUTH
+// =====================================
 
 export type LoginInput = {
   email: string;
@@ -31,12 +19,19 @@ export type LoginResponse = {
   sessionToken: string;
 };
 
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+// =====================================
+// CURRENT USER
+// =====================================
+
 export type AuthUser = {
   id: string;
   role: Role;
 };
-
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export type CurrentUser = {
   id: string;

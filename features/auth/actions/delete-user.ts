@@ -3,7 +3,7 @@
 import { requireUser } from "@/lib/auth/auth-service";
 import { UserManagementService } from "@/lib/users/user-management.service";
 import { AuditService } from "@/lib/audit/audit.service";
-import { DeleteUserInput } from "../types";
+import type { DeleteUserInput } from "@/features/users/type";
 
 export async function deleteUserAction({ userId }: DeleteUserInput) {
   const currentUser = await requireUser();
