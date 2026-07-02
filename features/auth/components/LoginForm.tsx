@@ -1,17 +1,10 @@
 "use client";
 
 import { useState } from "react";
-
-import { useRouter } from "next/navigation";
-
+import { useLogin } from "../hooks/useLogin";
 import { useForm } from "react-hook-form";
-
 import { zodResolver } from "@hookform/resolvers/zod";
-
 import { loginSchema, type LoginFormData } from "../schemas/login.schema";
-
-import { AuthApi } from "../api/auth.api";
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
-  const router = useRouter();
+  const { login } = useLogin();
 
   const [serverError, setServerError] = useState("");
 
@@ -43,11 +36,7 @@ export function LoginForm() {
   async function onSubmit(values: LoginFormData) {
     try {
       setServerError("");
-
-      await AuthApi.login(values);
-
-      router.replace("/");
-      router.refresh();
+      await login(values);
     } catch {
       setServerError("Invalid email or password");
     }
