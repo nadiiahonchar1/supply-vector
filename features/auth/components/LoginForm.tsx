@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 
 import { useForm } from "react-hook-form";
 
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { loginSchema, type LoginFormData } from "../schemas/login.schema";
+
 import { AuthApi } from "../api/auth.api";
-import type { LoginInput } from "../types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const loginSchema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(6, "Password must contain at least 6 characters"),
-});
-
 export function LoginForm() {
   const router = useRouter();
 
@@ -37,7 +32,7 @@ export function LoginForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({
+  } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -45,7 +40,7 @@ export function LoginForm() {
     },
   });
 
-  async function onSubmit(values: LoginInput) {
+  async function onSubmit(values: LoginFormData) {
     try {
       setServerError("");
 
