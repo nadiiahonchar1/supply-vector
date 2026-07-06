@@ -25,9 +25,4 @@ function changePassword(data: ChangePasswordInput) {
   );
 }
 
-export const AuthApi = {
-  login,
-  me,
-  logout,
-  changePassword,
-};
+export { login, logout, me, changePassword };
