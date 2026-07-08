@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 
+const PUBLIC_PATHS = ["/login", "/api/auth", "/_next", "/favicon.ico"];
+
 export async function proxy(req: NextRequest) {
   const token = req.cookies.get("session")?.value;
   const { pathname } = req.nextUrl;
 
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico" ||
-    pathname.startsWith("/api/auth")
-  ) {
+  const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+
+  if (isPublic) {
     return NextResponse.next();
   }
 
