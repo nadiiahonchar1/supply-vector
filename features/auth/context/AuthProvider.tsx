@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import { useRouter } from "next/navigation";
 
-import { logout as logoutApi, me } from "../api/auth.api";
+import { logout } from "../api/auth.api";
 import type { CurrentUser } from "../types";
 
-import { AuthContext } from "./AuthContext";
+type AuthContextValue = {
+  user: CurrentUser | null;
+  logout: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 type AuthProviderProps = {
   children: React.ReactNode;
@@ -13,35 +19,32 @@ type AuthProviderProps = {
 };
 
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
-  const [user, setUser] = useState<CurrentUser | null>(initialUser);
+  const router = useRouter();
 
-  const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await me();
+  const handleLogout = useCallback(async () => {
+    await logout();
 
-      setUser(currentUser);
-    } catch {
-      setUser(null);
-    }
-  }, []);
+    router.replace("/login");
+    router.refresh();
+  }, [router]);
 
-  const logout = useCallback(async () => {
-    try {
-      await logoutApi();
-    } finally {
-      setUser(null);
-    }
-  }, []);
-
-  const value = useMemo(
+  const value = useMemo<AuthContextValue>(
     () => ({
-      user,
-      loading: false,
-      refreshUser,
-      logout,
+      user: initialUser,
+      logout: handleLogout,
     }),
-    [user, refreshUser, logout],
+    [initialUser, handleLogout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+
+  return context;
 }

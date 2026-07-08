@@ -2,20 +2,22 @@
 
 import { useRouter } from "next/navigation";
 
-import { login as loginApi } from "../api/auth.api";
+import { login } from "../api/auth.api";
 import type { LoginInput } from "../types";
 
 export function useLogin() {
   const router = useRouter();
 
-  const login = async (data: LoginInput) => {
-    const result = await loginApi(data);
+  async function signIn(data: LoginInput) {
+    const result = await login(data);
 
     router.replace("/");
     router.refresh();
 
     return result;
-  };
+  }
 
-  return { login };
+  return {
+    login: signIn,
+  };
 }
