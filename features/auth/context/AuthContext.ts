@@ -6,7 +6,6 @@ import type { CurrentUser } from "../types";
 
 export type AuthContextValue = {
   user: CurrentUser | null;
-  loading: boolean;
 
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
