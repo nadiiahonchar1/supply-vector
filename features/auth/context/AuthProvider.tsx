@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { logout } from "../api/auth.api";
@@ -8,7 +14,9 @@ import type { CurrentUser } from "../types";
 
 type AuthContextValue = {
   user: CurrentUser | null;
+  setUser: (user: CurrentUser | null) => void;
   logout: () => Promise<void>;
+  isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -21,8 +29,12 @@ type AuthProviderProps = {
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const router = useRouter();
 
+  const [user, setUser] = useState(initialUser);
+
   const handleLogout = useCallback(async () => {
     await logout();
+
+    setUser(null);
 
     router.replace("/login");
     router.refresh();
@@ -30,10 +42,12 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: initialUser,
+      user,
+      setUser,
       logout: handleLogout,
+      isAuthenticated: user !== null,
     }),
-    [initialUser, handleLogout],
+    [user, handleLogout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

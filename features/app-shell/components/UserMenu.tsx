@@ -24,7 +24,6 @@ export function UserMenu() {
     return null;
   }
 
-  //   const initials = `${user.first_name[0] ?? ""}${user.last_name[0] ?? ""}`;
   const initials = getUserInitials(user);
 
   return (
