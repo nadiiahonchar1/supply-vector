@@ -6,11 +6,9 @@ import type { CurrentUser } from "../types";
 
 export type AuthContextValue = {
   user: CurrentUser | null;
-
-  refreshUser: () => Promise<void>;
+  setUser: (user: CurrentUser | null) => void;
   logout: () => Promise<void>;
+  isAuthenticated: boolean;
 };
 
-export const AuthContext = createContext<AuthContextValue | undefined>(
-  undefined,
-);
+export const AuthContext = createContext<AuthContextValue | null>(null);

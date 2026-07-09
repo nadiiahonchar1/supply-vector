@@ -1,13 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthContext } from "./AuthContext";
 
 import { logout } from "../api/auth.api";
 import type { CurrentUser } from "../types";
@@ -18,8 +13,6 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
-
-const AuthContext = createContext<AuthContextValue | null>(null);
 
 type AuthProviderProps = {
   children: React.ReactNode;
@@ -51,14 +44,4 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
-  return context;
 }
