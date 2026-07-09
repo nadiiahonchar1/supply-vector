@@ -8,7 +8,9 @@ import {
   Warehouse,
 } from "lucide-react";
 
-export const navigation = [
+import type { NavigationItem } from "../types";
+
+export const navigation: NavigationItem[] = [
   {
     title: "Dashboard",
     href: "/",
@@ -44,4 +46,4 @@ export const navigation = [
     href: "/users",
     icon: Users,
   },
-] as const;
+];
