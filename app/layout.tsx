@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "SupplyVector",
   description: "SupplyVector",
