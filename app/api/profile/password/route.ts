@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ProfileService } from "@/lib/profile/profile.service";
+import { handleApiError } from "@/lib/errors/handle-api-error";
 
 export async function POST(req: Request) {
   try {
@@ -12,22 +13,6 @@ export async function POST(req: Request) {
       success: true,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
-
-    let status = 500;
-
-    if (message === "Unauthorized") {
-      status = 401;
-    }
-
-    if (
-      message === "Current password is incorrect" ||
-      message === "User not found"
-    ) {
-      status = 400;
-    }
-
-    return NextResponse.json({ message }, { status });
+    return handleApiError(error);
   }
 }

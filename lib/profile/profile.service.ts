@@ -2,8 +2,12 @@ import bcrypt from "bcryptjs";
 
 import { sql } from "@/db";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
-
 import type { CurrentUser } from "@/features/auth/types";
+import {
+  UnauthorizedError,
+  ValidationError,
+  NotFoundError,
+} from "@/lib/errors/errors";
 
 export type UpdateProfileDto = {
   first_name: string;
@@ -20,7 +24,7 @@ export class ProfileService {
     const user = await getCurrentUser();
 
     if (!user) {
-      throw new Error("Unauthorized");
+      throw new UnauthorizedError();
     }
 
     return user;
@@ -62,13 +66,13 @@ export class ProfileService {
     const passwordHash = users[0]?.password_hash;
 
     if (!passwordHash) {
-      throw new Error("User not found");
+      throw new NotFoundError("User not found");
     }
 
     const isValid = await bcrypt.compare(data.currentPassword, passwordHash);
 
     if (!isValid) {
-      throw new Error("Current password is incorrect");
+      throw new ValidationError("Current password is incorrect");
     }
 
     const hash = await bcrypt.hash(data.newPassword, 12);
