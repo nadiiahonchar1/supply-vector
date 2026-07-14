@@ -1,6 +1,5 @@
 import { apiClient } from "@/lib/api-client";
 import type {
-  ChangePasswordInput,
   CurrentUser,
   LoginInput,
   LoginResponse,
@@ -18,11 +17,11 @@ function logout() {
   return apiClient.post<{ success: boolean }>("/api/auth/logout");
 }
 
-function changePassword(data: ChangePasswordInput) {
-  return apiClient.post<{ success: boolean }>(
-    "/api/auth/change-password",
-    data,
-  );
-}
+// function changePassword(data: ChangePasswordInput) {
+//   return apiClient.post<{ success: boolean }>(
+//     "/api/auth/change-password",
+//     data,
+//   );
+// }
 
-export { login, logout, me, changePassword };
+export { login, logout, me };

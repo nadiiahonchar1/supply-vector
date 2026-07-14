@@ -19,11 +19,6 @@ export type LoginResponse = {
   sessionToken: string;
 };
 
-export type ChangePasswordInput = {
-  currentPassword: string;
-  newPassword: string;
-};
-
 // =====================================
 // CURRENT USER
 // =====================================
