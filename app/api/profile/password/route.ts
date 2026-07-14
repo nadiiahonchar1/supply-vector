@@ -1,21 +1,33 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { UserManagementService } from "@/lib/users/user-management.service";
-import { AuditService } from "@/lib/audit/audit.service";
+import { ProfileService } from "@/lib/profile/profile.service";
 
 export async function POST(req: Request) {
-  const input = await req.json();
-  const currentUser = await requireUser();
+  try {
+    const body = await req.json();
 
-  await UserManagementService.changePassword(currentUser, input);
+    await ProfileService.changePassword(body);
 
-  await AuditService.log({
-    userId: currentUser.id,
-    action: "password:change",
-    entity: "users",
-    entityId: currentUser.id,
-  });
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
 
-  return NextResponse.json({ success: true });
+    let status = 500;
+
+    if (message === "Unauthorized") {
+      status = 401;
+    }
+
+    if (
+      message === "Current password is incorrect" ||
+      message === "User not found"
+    ) {
+      status = 400;
+    }
+
+    return NextResponse.json({ message }, { status });
+  }
 }

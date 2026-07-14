@@ -1,42 +1,36 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { sql } from "@/db";
+import { ProfileService } from "@/lib/profile/profile.service";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  try {
+    const profile = await ProfileService.getProfile();
 
-  if (!user) {
+    return NextResponse.json(profile);
+  } catch {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-
-  return NextResponse.json(user);
 }
 
 export async function PATCH(req: Request) {
-  const currentUser = await getCurrentUser();
+  try {
+    const body = await req.json();
 
-  if (!currentUser) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const profile = await ProfileService.updateProfile(body);
+
+    return NextResponse.json(profile);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "Unauthorized"
+            ? 401
+            : 500,
+      },
+    );
   }
-
-  const body = await req.json();
-
-  const { first_name, last_name } = body;
-
-  const result = await sql`
-    UPDATE users
-    SET
-      first_name = ${first_name},
-      last_name = ${last_name}
-    WHERE id = ${currentUser.id}
-    RETURNING
-      id,
-      email,
-      first_name,
-      last_name,
-      is_active
-  `;
-
-  return NextResponse.json(result[0]);
 }
