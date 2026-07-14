@@ -6,14 +6,16 @@ import type {
   ChangePasswordInput,
 } from "../types";
 
-export function getProfile() {
-  return apiClient.get<Profile>("/api/profile");
-}
+export const ProfileApi = {
+  getProfile() {
+    return apiClient.get<Profile>("/api/profile");
+  },
 
-export function updateProfile(data: UpdateProfileInput) {
-  return apiClient.patch<Profile>("/api/profile", data);
-}
+  updateProfile(data: UpdateProfileInput) {
+    return apiClient.patch<Profile>("/api/profile", data);
+  },
 
-export function changePassword(data: ChangePasswordInput) {
-  return apiClient.post<{ success: boolean }>("/api/profile/password", data);
-}
+  changePassword(data: ChangePasswordInput) {
+    return apiClient.post<{ success: true }>("/api/profile/password", data);
+  },
+};

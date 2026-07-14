@@ -32,21 +32,21 @@ export const apiClient = {
   post<T>(url: string, body?: unknown) {
     return request<T>(url, {
       method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   },
 
   put<T>(url: string, body?: unknown) {
     return request<T>(url, {
       method: "PUT",
-      body: JSON.stringify(body),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   },
 
   patch<T>(url: string, body?: unknown) {
     return request<T>(url, {
       method: "PATCH",
-      body: JSON.stringify(body),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   },
 
