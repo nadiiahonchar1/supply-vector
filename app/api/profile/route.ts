@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { ProfileService } from "@/lib/profile/profile.service";
+import { validate } from "@/lib/validation/validate";
 import { handleApiError } from "@/lib/errors/handle-api-error";
+
+import { updateProfileSchema } from "@/features/profile/validation/profile.schema";
 
 export async function GET() {
   try {
@@ -15,7 +18,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const body = validate(updateProfileSchema, await req.json());
 
     const profile = await ProfileService.updateProfile(body);
 
