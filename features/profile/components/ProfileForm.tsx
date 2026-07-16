@@ -6,81 +6,89 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/features/auth/context/useAuth";
-
-import { useProfile } from "../api/hooks/useProfile";
 import { useUpdateProfile } from "../api/hooks/useUpdateProfile";
 
 import {
-  profileSchema,
-  type ProfileSchema,
+  updateProfileSchema,
+  type UpdateProfileInput,
 } from "../validation/profile.schema";
 
 export function ProfileForm() {
-  const { profile, setProfile, isLoading } = useProfile();
+  const { user, setUser } = useAuth();
   const { updateProfile } = useUpdateProfile();
-  const { setUser } = useAuth();
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ProfileSchema>({
-    resolver: zodResolver(profileSchema),
+  } = useForm<UpdateProfileInput>({
+    resolver: zodResolver(updateProfileSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+    },
   });
 
   useEffect(() => {
-    if (!profile) return;
+    if (!user) return;
 
     reset({
-      first_name: profile.first_name,
-      last_name: profile.last_name,
+      first_name: user.first_name,
+      last_name: user.last_name,
     });
-  }, [profile, reset]);
+  }, [user, reset]);
 
-  async function onSubmit(data: ProfileSchema) {
-    const updated = await updateProfile(data);
+  async function onSubmit(data: UpdateProfileInput) {
+    const updatedUser = await updateProfile(data);
 
-    setProfile(updated);
-    setUser(updated as never);
+    setUser(updatedUser);
 
     toast.success("Profile updated");
   }
 
-  if (isLoading) {
+  if (!user) {
     return <div>Loading...</div>;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
-        <label>First name</label>
+        <label className="mb-2 block text-sm font-medium">First name</label>
 
         <input
           {...register("first_name")}
           className="w-full rounded-md border p-2"
         />
 
-        <p className="text-sm text-red-500">{errors.first_name?.message}</p>
+        {errors.first_name && (
+          <p className="mt-1 text-sm text-red-500">
+            {errors.first_name.message}
+          </p>
+        )}
       </div>
 
       <div>
-        <label>Last name</label>
+        <label className="mb-2 block text-sm font-medium">Last name</label>
 
         <input
           {...register("last_name")}
           className="w-full rounded-md border p-2"
         />
 
-        <p className="text-sm text-red-500">{errors.last_name?.message}</p>
+        {errors.last_name && (
+          <p className="mt-1 text-sm text-red-500">
+            {errors.last_name.message}
+          </p>
+        )}
       </div>
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+        className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
       >
-        Save
+        {isSubmitting ? "Saving..." : "Save changes"}
       </button>
     </form>
   );
