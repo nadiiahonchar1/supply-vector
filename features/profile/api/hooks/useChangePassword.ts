@@ -1,6 +1,7 @@
 "use client";
 
 import { ProfileApi } from "../profile.api";
+
 import type { ChangePasswordInput } from "../../types";
 
 export function useChangePassword() {

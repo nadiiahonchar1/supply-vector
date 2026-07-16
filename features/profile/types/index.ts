@@ -1,3 +1,4 @@
+import type { Role } from "@/features/auth";
 export type Profile = {
   id: string;
 
@@ -7,7 +8,7 @@ export type Profile = {
 
   last_name: string;
 
-  role: string;
+  role: Role;
 
   is_active: boolean;
 };
@@ -20,4 +21,10 @@ export type UpdateProfileInput = {
 export type ChangePasswordInput = {
   currentPassword: string;
   newPassword: string;
+};
+
+export type ChangePasswordFormValues = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 };
