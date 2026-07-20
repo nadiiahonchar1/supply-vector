@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { LogOut, User } from "lucide-react";
 
 import { useAuth } from "@/features/auth/context/useAuth";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { getUserInitials } from "@/features/auth/utils/user";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import {
@@ -29,7 +31,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-accent transition-colors">
+        <button className="flex items-center gap-3 rounded-md px-2 py-1 transition-colors hover:bg-accent">
           <Avatar className="size-9">
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
@@ -49,9 +51,11 @@ export function UserMenu() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem>
-          <User className="mr-2 size-4" />
-          Profile
+        <DropdownMenuItem asChild>
+          <Link href="/profile">
+            <User className="mr-2 size-4" />
+            Profile
+          </Link>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
