@@ -5,7 +5,8 @@ import { LogOut, User } from "lucide-react";
 
 import { useAuth } from "@/features/auth/context/useAuth";
 import { useLogout } from "@/features/auth/hooks/useLogout";
-import { getUserInitials } from "@/features/auth/utils/user";
+import { getUserFullName, getUserInitials } from "@/features/auth/utils/user";
+import { getRoleLabel } from "@/features/auth/constants/role-labels";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -26,22 +27,20 @@ export function UserMenu() {
     return null;
   }
 
-  const initials = getUserInitials(user);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-3 rounded-md px-2 py-1 transition-colors hover:bg-accent">
           <Avatar className="size-9">
-            <AvatarFallback>{initials}</AvatarFallback>
+            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
           </Avatar>
 
           <div className="text-left">
-            <div className="text-sm font-medium">
-              {user.first_name} {user.last_name}
-            </div>
+            <div className="text-sm font-medium">{getUserFullName(user)}</div>
 
-            <div className="text-xs text-muted-foreground">{user.role}</div>
+            <div className="text-xs text-muted-foreground">
+              {getRoleLabel(user.role)}
+            </div>
           </div>
         </button>
       </DropdownMenuTrigger>
@@ -54,7 +53,7 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/profile">
             <User className="mr-2 size-4" />
-            Profile
+            Профіль
           </Link>
         </DropdownMenuItem>
 
@@ -62,7 +61,7 @@ export function UserMenu() {
 
         <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 size-4" />
-          Logout
+          Вийти
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
