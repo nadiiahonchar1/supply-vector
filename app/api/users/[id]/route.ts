@@ -19,7 +19,9 @@ export async function GET(_: Request, { params }: Params) {
     const currentUser = await requireUser();  
     const user = await UserManagementService.getUserById(currentUser, params.id);  
     return NextResponse.json(user);
-  }catch(error){return handleApiError(error)}
+  } catch (error) {
+    return handleApiError(error)
+  }
 }
 
 // =====================================
@@ -36,5 +38,7 @@ export async function DELETE(_: Request, { params }: Params) {
       entityId: params.id,
     });  
     return NextResponse.json(result);    
-  }catch(error){return handleApiError(error)}
+  } catch (error) {
+    return handleApiError(error)
+  }
 }
