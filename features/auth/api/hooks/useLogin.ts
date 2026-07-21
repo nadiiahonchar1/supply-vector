@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
-import { login } from "../api/auth.api";
-import type { LoginInput } from "../types";
+import { login } from "../auth.api";
+import type { LoginInput } from "../../types";
 
 export function useLogin() {
   const router = useRouter();

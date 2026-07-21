@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LogOut, User } from "lucide-react";
 
 import { useAuth } from "@/features/auth/context/useAuth";
-import { useLogout } from "@/features/auth/hooks/useLogout";
+import { useLogout } from "@/features/auth/api/hooks/useLogout";
 import { getUserFullName, getUserInitials } from "@/features/auth/utils/user";
 import { getRoleLabel } from "@/features/auth/constants/role-labels";
 

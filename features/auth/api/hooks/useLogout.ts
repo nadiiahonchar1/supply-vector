@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "../context/useAuth";
+import { useAuth } from "../../context/useAuth";
 
 export const useLogout = () => {
   const { logout } = useAuth();

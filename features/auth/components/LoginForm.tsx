@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useLogin } from "../hooks/useLogin";
+import { useLogin } from "../api/hooks/useLogin";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormData } from "../schemas/login.schema";
+import { loginSchema, type LoginFormData } from "../validation/login.schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
