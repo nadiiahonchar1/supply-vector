@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/auth-service";
 import { UserManagementService } from "@/lib/users/user-management.service";
 import { AuditService } from "@/lib/audit/audit.service";
+import { handleApiError } from "@/lib/errors/handle-api-error";
 
 export async function GET() {
   const currentUser = await requireUser();
