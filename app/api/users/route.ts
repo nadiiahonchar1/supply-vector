@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth/auth-service";
-import { UserManagementService } from "@/lib/users/user-management.service";
+import { UserManagementService } from "@/lib/users/users.service";
 import { AuditService } from "@/lib/audit/audit.service";
 import { handleApiError } from "@/lib/errors/handle-api-error";
 

@@ -1,29 +1,30 @@
-import type { Role, Permission } from "@/features/auth/types";
+import type { Role, Permission } from "@/features/auth";
 
 export const ROLES = {
   SUPER_ADMIN: "superadmin",
   ADMIN: "admin",
   MANAGER: "manager",
-  VIEWER: "viewer",
+  OPERATOR: "operator",
 } as const;
 
 // =====================================
 // ROLE HIERARCHY
 // =====================================
+
 export const roleHierarchy: Record<Role, number> = {
   superadmin: 4,
   admin: 3,
   manager: 2,
-  viewer: 1,
+  operator: 1,
 };
 
 // =====================================
 // PERMISSIONS
 // =====================================
+
 export const PERMISSIONS = {
   // USERS
   USER_CREATE: "user:create",
-  USER_DELETE: "user:delete",
   USER_UPDATE: "user:update",
   USER_VIEW: "user:view",
 
@@ -48,10 +49,10 @@ export const PERMISSIONS = {
 // =====================================
 // ROLE → PERMISSIONS MAP
 // =====================================
+
 export const rolePermissions: Record<Role, Permission[]> = {
   superadmin: [
     PERMISSIONS.USER_CREATE,
-    PERMISSIONS.USER_DELETE,
     PERMISSIONS.USER_UPDATE,
     PERMISSIONS.USER_VIEW,
     PERMISSIONS.ROLE_ASSIGN,
@@ -72,6 +73,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.USER_CREATE,
     PERMISSIONS.USER_UPDATE,
     PERMISSIONS.USER_VIEW,
+    PERMISSIONS.ROLE_ASSIGN,
 
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
@@ -86,6 +88,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
   ],
 
   manager: [
+    PERMISSIONS.USER_VIEW,
+
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
@@ -94,12 +98,19 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.SHIPMENT_VIEW,
   ],
 
-  viewer: [PERMISSIONS.SHIPMENT_VIEW, PERMISSIONS.INVENTORY_VIEW],
+  operator: [
+    PERMISSIONS.USER_VIEW,
+
+    PERMISSIONS.INVENTORY_VIEW,
+
+    PERMISSIONS.SHIPMENT_VIEW,
+  ],
 };
 
 // =====================================
 // HELPERS
 // =====================================
+
 export function hasPermission(role: Role, permission: Permission): boolean {
   return rolePermissions[role]?.includes(permission) ?? false;
 }

@@ -3,8 +3,9 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { canManageRole } from "@/lib/auth/permissions";
 import { UserPolicy } from "@/lib/auth/policies";
 
-import { CurrentUser, ChangePasswordInput } from "@/features/auth/types";
-import { CreateUserInput } from "@/features/users/type";
+// import { CurrentUser, ChangePasswordInput } from "@/features/auth/types";
+import { CurrentUser } from "@/features/auth/types";
+import { CreateUserInput } from "@/features/users/types";
 
 // =====================================================
 // SERVICE
@@ -125,53 +126,53 @@ export class UserManagementService {
   // -------------------------------------
   // CHANGE PASSWORD
   // -------------------------------------
-  static async changePassword(
-    currentUser: CurrentUser,
-    input: ChangePasswordInput,
-  ) {
-    const userRows = await sql`
-      SELECT password_hash
-      FROM users
-      WHERE id = ${currentUser.id}
-      LIMIT 1
-    `;
+  // static async changePassword(
+  //   currentUser: CurrentUser,
+  //   input: ChangePasswordInput,
+  // ) {
+  //   const userRows = await sql`
+  //     SELECT password_hash
+  //     FROM users
+  //     WHERE id = ${currentUser.id}
+  //     LIMIT 1
+  //   `;
 
-    const user = userRows[0];
+  //   const user = userRows[0];
 
-    if (!user) {
-      throw new Error("User not found");
-    }
+  //   if (!user) {
+  //     throw new Error("User not found");
+  //   }
 
-    const isValid = await verifyPassword(
-      input.currentPassword,
-      user.password_hash,
-    );
+  //   const isValid = await verifyPassword(
+  //     input.currentPassword,
+  //     user.password_hash,
+  //   );
 
-    if (!isValid) {
-      throw new Error("Current password is incorrect");
-    }
+  //   if (!isValid) {
+  //     throw new Error("Current password is incorrect");
+  //   }
 
-    const isSame = await verifyPassword(input.newPassword, user.password_hash);
+  //   const isSame = await verifyPassword(input.newPassword, user.password_hash);
 
-    if (isSame) {
-      throw new Error("New password must be different");
-    }
+  //   if (isSame) {
+  //     throw new Error("New password must be different");
+  //   }
 
-    const newHash = await hashPassword(input.newPassword);
+  //   const newHash = await hashPassword(input.newPassword);
 
-    await sql`
-      UPDATE users
-      SET password_hash = ${newHash}, updated_at = NOW()
-      WHERE id = ${currentUser.id}
-    `;
+  //   await sql`
+  //     UPDATE users
+  //     SET password_hash = ${newHash}, updated_at = NOW()
+  //     WHERE id = ${currentUser.id}
+  //   `;
 
-    await sql`
-      INSERT INTO password_history (user_id, password_hash)
-      VALUES (${currentUser.id}, ${newHash})
-    `;
+  //   await sql`
+  //     INSERT INTO password_history (user_id, password_hash)
+  //     VALUES (${currentUser.id}, ${newHash})
+  //   `;
 
-    return { success: true };
-  }
+  //   return { success: true };
+  // }
 
   static async listUsers(currentUser: CurrentUser) {
     if (!UserPolicy.canViewUsers(currentUser.role)) {
