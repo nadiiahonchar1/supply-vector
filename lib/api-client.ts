@@ -1,3 +1,5 @@
+import { ApiError } from "@/lib/errors/api-error";
+
 async function request<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -12,11 +14,13 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error = (await response.json().catch(() => null)) ?? {
-      message: response.statusText,
-    };
+    const error = await response.json().catch(() => null);
 
-    throw new Error(error.message ?? "Request failed");
+    throw new ApiError(error?.message ?? response.statusText, response.status);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json() as Promise<T>;
