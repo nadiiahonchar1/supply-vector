@@ -1,21 +1,6 @@
 import { sql } from "@/db";
 
-type AuditAction =
-  | "user:create"
-  | "user:delete"
-  | "user:update"
-  | "auth:login"
-  | "auth:logout"
-  | "password:change";
-
-export type AuditMeta =
-  | {
-      reason?: string;
-      changes?: Record<string, { from: unknown; to: unknown }>;
-      entity?: string;
-      entityId?: string;
-    }
-  | Record<string, unknown>;
+import type { AuditAction, AuditMeta } from "./audit.types";
 
 export class AuditService {
   static async log(params: {
