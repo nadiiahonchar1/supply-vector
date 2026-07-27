@@ -63,24 +63,77 @@ export class ProfileService {
       LIMIT 1
     `) as { password_hash: string }[];
 
-    const passwordHash = users[0]?.password_hash;
+    const currentPasswordHash = users[0]?.password_hash;
 
-    if (!passwordHash) {
+    if (!currentPasswordHash) {
       throw new NotFoundError("User not found");
     }
 
-    const isValid = await bcrypt.compare(data.currentPassword, passwordHash);
+    const isCurrentPasswordValid = await bcrypt.compare(
+      data.currentPassword,
+      currentPasswordHash,
+    );
 
-    if (!isValid) {
+    if (!isCurrentPasswordValid) {
       throw new ValidationError("Current password is incorrect");
     }
 
-    const hash = await bcrypt.hash(data.newPassword, 12);
+    const sameAsCurrent = await bcrypt.compare(
+      data.newPassword,
+      currentPasswordHash,
+    );
+
+    if (sameAsCurrent) {
+      throw new ValidationError(
+        "Новий пароль повинен відрізнятися від поточного",
+      );
+    }
+
+    const previousPasswords = (await sql`
+      SELECT password_hash
+      FROM password_history
+      WHERE user_id = ${currentUser.id}
+      ORDER BY created_at DESC
+      LIMIT 5
+    `) as { password_hash: string }[];
+
+    for (const previous of previousPasswords) {
+      const alreadyUsed = await bcrypt.compare(
+        data.newPassword,
+        previous.password_hash,
+      );
+
+      if (alreadyUsed) {
+        throw new ValidationError(
+          "Не можна використовувати один із останніх 5 паролів",
+        );
+      }
+    }
+
+    const newPasswordHash = await bcrypt.hash(data.newPassword, 12);
 
     await sql`
       UPDATE users
-      SET password_hash = ${hash}
+      SET password_hash = ${newPasswordHash}
       WHERE id = ${currentUser.id}
+    `;
+
+    await sql`
+      INSERT INTO password_history (
+        user_id,
+        password_hash
+      )
+      VALUES (
+        ${currentUser.id},
+        ${newPasswordHash}
+      )
+    `;
+
+    await sql`
+      UPDATE password_resets
+      SET used_at = NOW()
+      WHERE user_id = ${currentUser.id}
+        AND used_at IS NULL
     `;
   }
 }

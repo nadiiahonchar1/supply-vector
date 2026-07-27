@@ -41,10 +41,20 @@ export async function loginUser(email: string, password: string) {
 
   const sessionToken = await createSession(user.id);
 
+  const passwordReset = (await sql`
+    SELECT id
+    FROM password_resets
+    WHERE user_id = ${user.id}
+      AND used_at IS NULL
+      AND expires_at > NOW()
+    LIMIT 1
+  `) as { id: string }[];
+
   return {
     userId: user.id,
     email: user.email,
     sessionToken,
+    mustChangePassword: passwordReset.length > 0,
   };
 }
 

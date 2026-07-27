@@ -24,12 +24,7 @@ export const roleHierarchy: Record<Role, number> = {
 
 export const PERMISSIONS = {
   // USERS
-  USER_CREATE: "user:create",
-  USER_UPDATE: "user:update",
   USER_VIEW: "user:view",
-
-  // ROLES
-  ROLE_ASSIGN: "role:assign",
 
   // INVENTORY
   INVENTORY_VIEW: "inventory:view",
@@ -52,10 +47,7 @@ export const PERMISSIONS = {
 
 export const rolePermissions: Record<Role, Permission[]> = {
   superadmin: [
-    PERMISSIONS.USER_CREATE,
-    PERMISSIONS.USER_UPDATE,
     PERMISSIONS.USER_VIEW,
-    PERMISSIONS.ROLE_ASSIGN,
 
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
@@ -70,10 +62,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
   ],
 
   admin: [
-    PERMISSIONS.USER_CREATE,
-    PERMISSIONS.USER_UPDATE,
     PERMISSIONS.USER_VIEW,
-    PERMISSIONS.ROLE_ASSIGN,
 
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
@@ -119,6 +108,14 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
   return roleHierarchy[userRole] >= roleHierarchy[minRole];
 }
 
+/**
+ * Чи може користувач керувати іншою роллю.
+ *
+ * superadmin → admin, manager, operator
+ * admin      → manager, operator
+ * manager    → operator
+ * operator   → ніким
+ */
 export function canManageRole(currentRole: Role, targetRole: Role): boolean {
   return roleHierarchy[currentRole] > roleHierarchy[targetRole];
 }
