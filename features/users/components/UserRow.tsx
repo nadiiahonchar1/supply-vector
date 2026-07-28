@@ -4,6 +4,7 @@ import type { User } from "../types";
 
 import { RoleBadge } from "./RoleBadge";
 import { UserActions } from "./UserActions";
+import { UserStatusBadge } from "./UserStatusBadge";
 
 type Props = {
   user: User;
@@ -22,7 +23,9 @@ export function UserRow({ user }: Props) {
         <RoleBadge role={user.role} />
       </TableCell>
 
-      <TableCell>{user.is_active ? "Active" : "Inactive"}</TableCell>
+      <TableCell>
+        <UserStatusBadge isActive={user.is_active} />
+      </TableCell>
 
       <TableCell className="w-[64px] text-right">
         <UserActions user={user} />
