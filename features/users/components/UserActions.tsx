@@ -1,9 +1,7 @@
 "use client";
 
 import { MoreHorizontal } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { USERS_TEXT } from "../constants/users-text";
 
 import type { User } from "../types";
 
@@ -28,16 +27,16 @@ export function UserActions({ user }: Props) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end">
-        <DropdownMenuItem>Change role</DropdownMenuItem>
+        <DropdownMenuItem>{USERS_TEXT.actions.changeRole}</DropdownMenuItem>
 
-        <DropdownMenuItem>Edit stores</DropdownMenuItem>
+        <DropdownMenuItem>{USERS_TEXT.actions.assignStores}</DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
         {user.is_active ? (
-          <DropdownMenuItem>Deactivate</DropdownMenuItem>
+          <DropdownMenuItem>{USERS_TEXT.actions.deactivate}</DropdownMenuItem>
         ) : (
-          <DropdownMenuItem>Activate</DropdownMenuItem>
+          <DropdownMenuItem>{USERS_TEXT.actions.activate}</DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

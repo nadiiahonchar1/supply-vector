@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { USERS_TEXT } from "../constants/users-text";
 
 type Props = {
   isActive: boolean;
@@ -7,7 +8,7 @@ type Props = {
 export function UserStatusBadge({ isActive }: Props) {
   return (
     <Badge variant={isActive ? "default" : "secondary"}>
-      {isActive ? "Active" : "Inactive"}
+      {isActive ? USERS_TEXT.status.active : USERS_TEXT.status.inactive}
     </Badge>
   );
 }

@@ -1,3 +1,5 @@
-export default async function Page() {
-  return <h1>Users</h1>;
+import { UsersPage } from "@/features/users/components";
+
+export default function Page() {
+  return <UsersPage />;
 }
