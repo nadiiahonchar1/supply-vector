@@ -47,3 +47,17 @@ export type ChangeRoleInput = {
 export type UpdateUserStatusInput = {
   is_active: boolean;
 };
+
+// =====================================
+// MUTATIONS
+// =====================================
+
+export type ChangeRoleRequest = {
+  userId: string;
+  role: Role;
+};
+
+export type UpdateUserStatusRequest = {
+  userId: string;
+  is_active: boolean;
+};

@@ -1,15 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "../users.api";
-import type { Role } from "@/features/auth";
+import type { ChangeRoleRequest } from "../../types";
 
 export function useChangeRole() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
-      usersApi.changeRole(userId, {
-        role,
-      }),
+    mutationFn: ({ userId, role }: ChangeRoleRequest) =>
+      usersApi.changeRole(userId, { role }),
 
     onSuccess: () => {
       queryClient.invalidateQueries({
