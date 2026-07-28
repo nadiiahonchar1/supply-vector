@@ -3,6 +3,7 @@ export const USERS_TEXT = {
   subtitle: "Керуйте користувачами системи та їхніми ролями.",
 
   create: "Створити користувача",
+  creating: "Створення користувача",
 
   table: {
     firstName: "Ім'я",
