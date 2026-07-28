@@ -3,6 +3,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import type { User } from "../types";
 
 import { RoleBadge } from "./RoleBadge";
+import { UserActions } from "./UserActions";
 
 type Props = {
   user: User;
@@ -23,7 +24,9 @@ export function UserRow({ user }: Props) {
 
       <TableCell>{user.is_active ? "Active" : "Inactive"}</TableCell>
 
-      <TableCell>Actions</TableCell>
+      <TableCell className="w-[64px] text-right">
+        <UserActions user={user} />
+      </TableCell>
     </TableRow>
   );
 }
