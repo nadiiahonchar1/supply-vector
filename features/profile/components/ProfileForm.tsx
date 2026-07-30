@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 
 import { useAuth } from "@/features/auth/context/useAuth";
 import { useUpdateProfile } from "../api/hooks/useUpdateProfile";
+import { PROFILE_TEXT } from "../constants/profile-text";
 
 import {
   updateProfileSchema,
@@ -44,17 +45,19 @@ export function ProfileForm() {
 
     setUser(updatedUser);
 
-    toast.success("Profile updated");
+    toast.success(PROFILE_TEXT.toast_masages.success);
   }
 
   if (!user) {
-    return <div>Loading...</div>;
+    return <div>{PROFILE_TEXT.loading}</div>;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
-        <label className="mb-2 block text-sm font-medium">First name</label>
+        <label className="mb-2 block text-sm font-medium">
+          {PROFILE_TEXT.table.first_name}
+        </label>
 
         <input
           {...register("first_name")}
@@ -69,7 +72,9 @@ export function ProfileForm() {
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Last name</label>
+        <label className="mb-2 block text-sm font-medium">
+          {PROFILE_TEXT.table.last_name}
+        </label>
 
         <input
           {...register("last_name")}
@@ -88,7 +93,7 @@ export function ProfileForm() {
         disabled={isSubmitting}
         className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
       >
-        {isSubmitting ? "Saving..." : "Save changes"}
+        {isSubmitting ? PROFILE_TEXT.saving : PROFILE_TEXT.changed}
       </button>
     </form>
   );

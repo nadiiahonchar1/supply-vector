@@ -4,14 +4,14 @@ export const updateProfileSchema = z.object({
   first_name: z
     .string()
     .trim()
-    .min(2, "First name must contain at least 2 characters")
-    .max(50, "First name must be shorter than 50 characters"),
+    .min(2, "Ім'я повинно містити щонайменше 2 символи.")
+    .max(50, "Ім'я має містити менше ніж 50 символів."),
 
   last_name: z
     .string()
     .trim()
-    .min(2, "Last name must contain at least 2 characters")
-    .max(50, "Last name must be shorter than 50 characters"),
+    .min(2, "Прізвище повинно містити щонайменше 2 символи.")
+    .max(50, "Прізвище має містити менше ніж 50 символів."),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

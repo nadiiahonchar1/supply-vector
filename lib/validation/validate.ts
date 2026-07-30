@@ -7,7 +7,7 @@ export function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {
 
   if (!result.success) {
     throw new ValidationError(
-      result.error.issues[0]?.message ?? "Validation error",
+      result.error.issues[0]?.message ?? "Помилка валідації",
     );
   }
 

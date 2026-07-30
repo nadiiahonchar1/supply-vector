@@ -66,7 +66,7 @@ export class ProfileService {
     const currentPasswordHash = users[0]?.password_hash;
 
     if (!currentPasswordHash) {
-      throw new NotFoundError("User not found");
+      throw new NotFoundError("Користувача не знайдено");
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(
@@ -75,7 +75,7 @@ export class ProfileService {
     );
 
     if (!isCurrentPasswordValid) {
-      throw new ValidationError("Current password is incorrect");
+      throw new ValidationError("Поточний пароль неправильний");
     }
 
     const sameAsCurrent = await bcrypt.compare(

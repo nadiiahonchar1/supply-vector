@@ -6,8 +6,9 @@ import toast from "react-hot-toast";
 
 import { useChangePassword } from "../api/hooks/useChangePassword";
 
-import { changePasswordSchema } from "../validation/password.schema";
+import { changePasswordFormSchema } from "../validation/password.schema";
 import type { ChangePasswordFormValues } from "../types";
+import { PROFILE_TEXT } from "../constants/profile-text";
 
 export function SecurityForm() {
   const { changePassword } = useChangePassword();
@@ -18,7 +19,7 @@ export function SecurityForm() {
     reset,
     formState: { errors, isSubmitting },
   } = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(changePasswordSchema),
+    resolver: zodResolver(changePasswordFormSchema),
   });
 
   async function onSubmit(data: ChangePasswordFormValues) {
@@ -35,7 +36,7 @@ export function SecurityForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
-        <label>Current password</label>
+        <label>{PROFILE_TEXT.security_dialog.current_password}</label>
 
         <input
           type="password"
@@ -49,7 +50,7 @@ export function SecurityForm() {
       </div>
 
       <div>
-        <label>New password</label>
+        <label>{PROFILE_TEXT.security_dialog.new_password}</label>
 
         <input
           type="password"
@@ -61,7 +62,7 @@ export function SecurityForm() {
       </div>
 
       <div>
-        <label>Confirm password</label>
+        <label>{PROFILE_TEXT.security_dialog.confirm_password}</label>
 
         <input
           type="password"
@@ -79,7 +80,7 @@ export function SecurityForm() {
         disabled={isSubmitting}
         className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
       >
-        Change password
+        {PROFILE_TEXT.security_dialog.change}
       </button>
     </form>
   );
