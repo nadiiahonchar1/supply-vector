@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { CreateUserForm } from "./CreateUserForm";
+import { CreateUserSuccessDialog } from "./CreateUserSuccessDialog";
 import { USERS_TEXT } from "../../constants/users-text";
 
 type Props = {
@@ -21,6 +22,8 @@ export function CreateUserDialog({ open, onOpenChange }: Props) {
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
     null,
   );
+
+  const successOpen = temporaryPassword !== null;
 
   return (
     <>
@@ -39,7 +42,13 @@ export function CreateUserDialog({ open, onOpenChange }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* <CreateUserSuccessDialog/> */}
+      <CreateUserSuccessDialog
+        open={successOpen}
+        password={temporaryPassword}
+        onClose={() => {
+          setTemporaryPassword(null);
+        }}
+      />
     </>
   );
 }

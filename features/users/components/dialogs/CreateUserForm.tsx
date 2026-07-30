@@ -56,11 +56,14 @@ export function CreateUserForm({ onSuccess }: Props) {
   const onSubmit = async (data: CreateUserInput) => {
     try {
       const result = await mutateAsync(data);
+      console.log("SUCCESS");
 
       reset();
 
       onSuccess(result.temporaryPassword);
-    } catch {}
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
