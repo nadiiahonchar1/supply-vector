@@ -32,6 +32,7 @@ export const USERS_TEXT = {
     activate: "Активувати",
     deactivate: "Деактивувати",
     resetPassword: "Скинути пароль",
+    comingSoon: "Скоро",
   },
 
   success_dialog: {

@@ -4,11 +4,10 @@ import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
 
+import { useUpdateUserStatus } from "../../api";
 import { USERS_TEXT } from "../../constants/users-text";
 
 import type { User } from "../../types";
-
-import { useUpdateUserStatus } from "../../api";
 
 type Props = {
   user: User;
@@ -18,14 +17,16 @@ type Props = {
 export function ChangeUserStatusForm({ user, onSuccess }: Props) {
   const { mutateAsync, isPending, error } = useUpdateUserStatus();
 
-  async function handleChangeStatus() {
+  async function handleSubmit() {
     await mutateAsync({
       userId: user.id,
       is_active: !user.is_active,
     });
 
     toast.success(
-      user.is_active ? "Користувача деактивовано" : "Користувача активовано",
+      user.is_active
+        ? "Користувача успішно деактивовано"
+        : "Користувача успішно активовано",
     );
 
     onSuccess();
@@ -42,11 +43,11 @@ export function ChangeUserStatusForm({ user, onSuccess }: Props) {
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onSuccess}>
+        <Button variant="outline" onClick={onSuccess} disabled={isPending}>
           Скасувати
         </Button>
 
-        <Button disabled={isPending} onClick={handleChangeStatus}>
+        <Button onClick={handleSubmit} disabled={isPending}>
           {isPending
             ? USERS_TEXT.loading
             : user.is_active

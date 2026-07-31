@@ -226,3 +226,9 @@ CREATE TABLE inventory_movements (
 CREATE INDEX idx_inventory_movements_store_id ON inventory_movements(store_id);
 CREATE INDEX idx_inventory_movements_product_id ON inventory_movements(product_id);
 CREATE INDEX idx_inventory_movements_created_at ON inventory_movements(created_at);
+
+UPDATE roles
+SET
+    code = 'operator',
+    name = 'Operator'
+WHERE code = 'viewer';

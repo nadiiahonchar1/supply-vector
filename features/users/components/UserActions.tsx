@@ -2,7 +2,9 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import { USERS_TEXT } from "../constants/users-text";
-import { ChangeRoleDialog } from "./dialogs";
+
+import { ChangeRoleDialog, ChangeUserStatusDialog } from "./dialogs";
 
 import type { User } from "../types";
 
@@ -22,7 +26,6 @@ type Props = {
 export function UserActions({ user }: Props) {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [storesDialogOpen, setStoresDialogOpen] = useState(false);
 
   return (
     <>
@@ -35,27 +38,27 @@ export function UserActions({ user }: Props) {
 
         <DropdownMenuContent align="end">
           <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
+            onSelect={(event) => {
+              event.preventDefault();
               setRoleDialogOpen(true);
             }}
           >
             {USERS_TEXT.actions.changeRole}
           </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-            }}
-          >
+          <DropdownMenuItem disabled>
             {USERS_TEXT.actions.assignStores}
+
+            <span className="ml-auto rounded bg-muted px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+              {USERS_TEXT.actions.comingSoon}
+            </span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
+            onSelect={(event) => {
+              event.preventDefault();
               setStatusDialogOpen(true);
             }}
           >
@@ -76,12 +79,6 @@ export function UserActions({ user }: Props) {
         user={user}
         open={statusDialogOpen}
         onOpenChange={setStatusDialogOpen}
-      />
-
-      <AssignStoresDialog
-        user={user}
-        open={storesDialogOpen}
-        onOpenChange={setStoresDialogOpen}
       />
     </>
   );
