@@ -1,9 +1,10 @@
 "use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -11,15 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 
-import { ROLES } from "@/lib/auth/permissions";
+import { ROLES, canManageRole } from "@/lib/auth/permissions";
+import { useAuth } from "@/features/auth";
 
 import { USERS_TEXT } from "../../constants/users-text";
 import { changeRoleSchema } from "../../validation/user.schema";
-
 import { useChangeRole } from "../../api";
-
 import type { User, ChangeRoleInput } from "../../types";
 
 type Props = {
@@ -27,41 +26,42 @@ type Props = {
   onSuccess: () => void;
 };
 
-const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({
-  value: role,
-  label: USERS_TEXT.role[role],
-}));
-
 export function ChangeRoleForm({ user, onSuccess }: Props) {
   const {
     control,
-    setValue,
     handleSubmit,
     formState: { errors },
   } = useForm<ChangeRoleInput>({
     resolver: zodResolver(changeRoleSchema),
-
     defaultValues: {
       role: user.role,
     },
   });
 
-  const role = useWatch({
-    control,
-    name: "role",
-  });
-
   const { mutateAsync, isPending, error } = useChangeRole();
+  const { user: currentUser } = useAuth();
+  if (!currentUser) {
+    return null;
+  }
+
+  const roleOptions = Object.values(ROLES)
+    .filter((role) => canManageRole(currentUser.role, role))
+    .map((role) => ({
+      value: role,
+      label: USERS_TEXT.role[role],
+    }));
 
   const onSubmit = async (data: ChangeRoleInput) => {
-    await mutateAsync({
-      userId: user.id,
-      role: data.role,
-    });
+    try {
+      await mutateAsync({
+        userId: user.id,
+        role: data.role,
+      });
 
-    toast.success("Роль користувача успішно змінена");
+      toast.success("Роль користувача успішно змінена");
 
-    onSuccess();
+      onSuccess();
+    } catch {}
   };
 
   return (
@@ -69,26 +69,25 @@ export function ChangeRoleForm({ user, onSuccess }: Props) {
       <div className="space-y-2">
         <label>{USERS_TEXT.table.role}</label>
 
-        <Select
-          value={role}
-          onValueChange={(value) =>
-            setValue("role", value as ChangeRoleInput["role"], {
-              shouldValidate: true,
-            })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+        <Controller
+          control={control}
+          name="role"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
 
-          <SelectContent>
-            {ROLE_OPTIONS.map((roleOption) => (
-              <SelectItem key={roleOption.value} value={roleOption.value}>
-                {roleOption.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              <SelectContent>
+                {roleOptions.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
 
         {errors.role && (
           <p className="text-sm text-destructive">{errors.role.message}</p>

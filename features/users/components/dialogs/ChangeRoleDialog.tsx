@@ -8,10 +8,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { USERS_TEXT } from "../../constants/users-text";
-
-import type { User } from "../../types";
-
 import { ChangeRoleForm } from "../forms/ChangeRoleForm";
+import type { User } from "../../types";
 
 type Props = {
   user: User;

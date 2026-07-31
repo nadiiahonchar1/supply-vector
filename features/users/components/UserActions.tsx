@@ -4,7 +4,6 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { USERS_TEXT } from "../constants/users-text";
-
 import { ChangeRoleDialog, ChangeUserStatusDialog } from "./dialogs";
 
 import type { User } from "../types";
@@ -27,6 +25,18 @@ export function UserActions({ user }: Props) {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
 
+  const openRoleDialog = () => {
+    requestAnimationFrame(() => {
+      setRoleDialogOpen(true);
+    });
+  };
+
+  const openStatusDialog = () => {
+    requestAnimationFrame(() => {
+      setStatusDialogOpen(true);
+    });
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -37,12 +47,7 @@ export function UserActions({ user }: Props) {
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              setRoleDialogOpen(true);
-            }}
-          >
+          <DropdownMenuItem onSelect={openRoleDialog}>
             {USERS_TEXT.actions.changeRole}
           </DropdownMenuItem>
 
@@ -56,12 +61,7 @@ export function UserActions({ user }: Props) {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              setStatusDialogOpen(true);
-            }}
-          >
+          <DropdownMenuItem onSelect={openStatusDialog}>
             {user.is_active
               ? USERS_TEXT.actions.deactivate
               : USERS_TEXT.actions.activate}
