@@ -5,3 +5,4 @@ export * from "./UsersPage";
 export * from "./UsersTable";
 export * from "./UserActions";
 export * from "./dialogs";
+export * from "./forms"

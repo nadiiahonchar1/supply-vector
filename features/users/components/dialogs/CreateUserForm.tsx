@@ -27,6 +27,11 @@ type Props = {
   onSuccess: (temporaryPassword: string) => void;
 };
 
+const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({
+  value: role,
+  label: USERS_TEXT.role[role],
+}));
+
 export function CreateUserForm({ onSuccess }: Props) {
   const {
     register,
@@ -54,16 +59,11 @@ export function CreateUserForm({ onSuccess }: Props) {
   });
 
   const onSubmit = async (data: CreateUserInput) => {
-    try {
-      const result = await mutateAsync(data);
-      console.log("SUCCESS");
+    const result = await mutateAsync(data);
 
-      reset();
+    reset();
 
-      onSuccess(result.temporaryPassword);
-    } catch (error) {
-      console.error(error);
-    }
+    onSuccess(result.temporaryPassword);
   };
 
   return (
@@ -116,15 +116,11 @@ export function CreateUserForm({ onSuccess }: Props) {
           </SelectTrigger>
 
           <SelectContent>
-            <SelectItem value={ROLES.ADMIN}>{USERS_TEXT.role.admin}</SelectItem>
-
-            <SelectItem value={ROLES.MANAGER}>
-              {USERS_TEXT.role.manager}
-            </SelectItem>
-
-            <SelectItem value={ROLES.OPERATOR}>
-              {USERS_TEXT.role.operator}
-            </SelectItem>
+            {ROLE_OPTIONS.map((roleOption) => (
+              <SelectItem key={roleOption.value} value={roleOption.value}>
+                {roleOption.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

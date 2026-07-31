@@ -108,14 +108,6 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
   return roleHierarchy[userRole] >= roleHierarchy[minRole];
 }
 
-/**
- * Чи може користувач керувати іншою роллю.
- *
- * superadmin → admin, manager, operator
- * admin      → manager, operator
- * manager    → operator
- * operator   → ніким
- */
 export function canManageRole(currentRole: Role, targetRole: Role): boolean {
   return roleHierarchy[currentRole] > roleHierarchy[targetRole];
 }
