@@ -221,40 +221,56 @@ export class UsersService {
     const currentUser = await this.requireCurrentUser();
 
     if (!hasMinRole(currentUser.role, ROLES.MANAGER)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError("Щось пішло не так");
     }
 
-    const users = (await sql`
-      UPDATE users
-      SET
-        is_active = ${data.is_active},
-        updated_at = NOW()
-      WHERE id = ${id}
-        AND deleted_at IS NULL
-      RETURNING
-        id,
-        email,
-        first_name,
-        last_name,
-        is_active
-    `) as Omit<User, "role">[];
+    const targetUsers = (await sql`
+    SELECT
+      u.id,
+      r.code AS role
+    FROM users u
+    JOIN user_roles ur
+      ON ur.user_id = u.id
+    JOIN roles r
+      ON r.id = ur.role_id
+    WHERE
+      u.id = ${id}
+      AND u.deleted_at IS NULL
+    LIMIT 1
+  `) as {
+      id: string;
+      role: User["role"];
+    }[];
 
-    if (!users.length) {
+    if (!targetUsers.length) {
       throw new NotFoundError("Користувача не знайдено");
     }
 
-    const roles = (await sql`
-      SELECT r.code AS role
-      FROM user_roles ur
-      JOIN roles r
-        ON r.id = ur.role_id
-      WHERE ur.user_id = ${id}
-      LIMIT 1
-    `) as { role: User["role"] }[];
+    const targetUser = targetUsers[0];
+
+    if (!canManageRole(currentUser.role, targetUser.role)) {
+      throw new ForbiddenError(
+        "Недостатньо прав для зміни статусу цього користувача",
+      );
+    }
+
+    const users = (await sql`
+    UPDATE users
+    SET
+      is_active = ${data.is_active},
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING
+      id,
+      email,
+      first_name,
+      last_name,
+      is_active
+  `) as Omit<User, "role">[];
 
     return {
       ...users[0],
-      role: roles[0].role,
+      role: targetUser.role,
     };
   }
 }
