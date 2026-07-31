@@ -24,6 +24,15 @@ type RoleRow = {
   id: string;
 };
 
+type UserWithRole = {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_active: boolean;
+  role: User["role"];
+};
+
 export class UsersService {
   private static async requireCurrentUser() {
     const currentUser = await getCurrentUser();
@@ -48,6 +57,33 @@ export class UsersService {
     }
 
     return roles[0].id;
+  }
+
+  private static async getUserWithRole(id: string): Promise<UserWithRole> {
+    const users = (await sql`
+    SELECT
+      u.id,
+      u.email,
+      u.first_name,
+      u.last_name,
+      u.is_active,
+      r.code AS role
+    FROM users u
+    JOIN user_roles ur
+      ON ur.user_id = u.id
+    JOIN roles r
+      ON r.id = ur.role_id
+    WHERE
+      u.id = ${id}
+      AND u.deleted_at IS NULL
+    LIMIT 1
+  `) as UserWithRole[];
+
+    if (!users.length) {
+      throw new NotFoundError("Користувача не знайдено");
+    }
+
+    return users[0];
   }
 
   static async getUsers(): Promise<User[]> {
@@ -174,44 +210,17 @@ export class UsersService {
       throw new ForbiddenError();
     }
 
+    await this.getUserWithRole(id);
+
     const roleId = await this.getRoleId(data.role);
 
-    const existing = (await sql`
-      SELECT id
-      FROM users
-      WHERE id = ${id}
-        AND deleted_at IS NULL
-      LIMIT 1
-    `) as { id: string }[];
-
-    if (!existing.length) {
-      throw new NotFoundError("Користувача не знайдено");
-    }
-
     await sql`
-      UPDATE user_roles
-      SET role_id = ${roleId}
-      WHERE user_id = ${id}
-    `;
+    UPDATE user_roles
+    SET role_id = ${roleId}
+    WHERE user_id = ${id}
+  `;
 
-    const users = (await sql`
-      SELECT
-        u.id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.is_active,
-        r.code AS role
-      FROM users u
-      JOIN user_roles ur
-        ON ur.user_id = u.id
-      JOIN roles r
-        ON r.id = ur.role_id
-      WHERE u.id = ${id}
-      LIMIT 1
-    `) as User[];
-
-    return users[0];
+    return this.getUserWithRole(id);
   }
 
   static async updateUserStatus(
@@ -221,32 +230,10 @@ export class UsersService {
     const currentUser = await this.requireCurrentUser();
 
     if (!hasMinRole(currentUser.role, ROLES.MANAGER)) {
-      throw new ForbiddenError("Щось пішло не так");
+      throw new ForbiddenError();
     }
 
-    const targetUsers = (await sql`
-    SELECT
-      u.id,
-      r.code AS role
-    FROM users u
-    JOIN user_roles ur
-      ON ur.user_id = u.id
-    JOIN roles r
-      ON r.id = ur.role_id
-    WHERE
-      u.id = ${id}
-      AND u.deleted_at IS NULL
-    LIMIT 1
-  `) as {
-      id: string;
-      role: User["role"];
-    }[];
-
-    if (!targetUsers.length) {
-      throw new NotFoundError("Користувача не знайдено");
-    }
-
-    const targetUser = targetUsers[0];
+    const targetUser = await this.getUserWithRole(id);
 
     if (!canManageRole(currentUser.role, targetUser.role)) {
       throw new ForbiddenError(
@@ -254,23 +241,14 @@ export class UsersService {
       );
     }
 
-    const users = (await sql`
+    await sql`
     UPDATE users
     SET
       is_active = ${data.is_active},
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING
-      id,
-      email,
-      first_name,
-      last_name,
-      is_active
-  `) as Omit<User, "role">[];
+  `;
 
-    return {
-      ...users[0],
-      role: targetUser.role,
-    };
+    return this.getUserWithRole(id);
   }
 }
