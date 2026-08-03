@@ -2,8 +2,7 @@
 
 import { useUsers } from "../api/hooks";
 import { USERS_TEXT } from "../constants/users-text";
-import { UsersGroups } from "./UsersGroups";
-
+import { UsersTable } from "./UsersTable";
 export function UsersContent() {
   const { data, isLoading, error } = useUsers();
 
@@ -19,5 +18,5 @@ export function UsersContent() {
     return <div>{USERS_TEXT.empty}</div>;
   }
 
-  return <UsersGroups users={data} />;
+  return <UsersTable users={data} />;
 }

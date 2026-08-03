@@ -8,9 +8,9 @@ type Props = {
 export function GroupHeaderRow({ title, count }: Props) {
   return (
     <TableRow className="bg-muted/40 hover:bg-muted/40">
-      <TableCell colSpan={6} className="py-3 font-semibold">
+      <TableCell colSpan={6} className="py-3">
         <div className="flex items-center justify-between">
-          <span>{title}</span>
+          <span className="font-semibold">{title}</span>
 
           <span className="text-sm text-muted-foreground">{count}</span>
         </div>

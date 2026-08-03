@@ -7,4 +7,3 @@ export * from "./UserActions";
 export * from "./dialogs";
 export * from "./forms";
 export * from "./UsersContent";
-export * from "./UsersGroups";

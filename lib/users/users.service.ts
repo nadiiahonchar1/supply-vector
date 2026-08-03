@@ -3,7 +3,12 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/db";
 
 import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { canManageRole, hasMinRole, getManageableRoles, ROLES } from "@/lib/auth/permissions";
+import {
+  canManageRole,
+  hasMinRole,
+  getVisibleRoles,
+  ROLES,
+} from "@/lib/auth/permissions";
 import { generateTemporaryPassword } from "@/lib/utils/password";
 
 import {
@@ -89,9 +94,9 @@ export class UsersService {
   static async getUsers(): Promise<User[]> {
     const currentUser = await this.requireCurrentUser();
 
-    const manageableRoles = getManageableRoles(currentUser.role);
+    const visibleRoles = getVisibleRoles(currentUser.role);
 
-    const users = (await sql`
+    return (await sql`
     SELECT
       u.id,
       u.email,
@@ -104,14 +109,19 @@ export class UsersService {
       ON ur.user_id = u.id
     JOIN roles r
       ON r.id = ur.role_id
-    WHERE u.deleted_at IS NULL
-    ORDER BY u.first_name, u.last_name
+    WHERE
+      u.deleted_at IS NULL
+      AND r.code = ANY(${visibleRoles})
+    ORDER BY
+      CASE r.code
+        WHEN 'superadmin' THEN 1
+        WHEN 'admin' THEN 2
+        WHEN 'manager' THEN 3
+        WHEN 'operator' THEN 4
+      END,
+      u.last_name ASC,
+      u.first_name ASC
   `) as User[];
-
-    return users.filter(
-      (user) =>
-        user.id === currentUser.id || manageableRoles.includes(user.role),
-    );
   }
 
   static async createUser(data: CreateUserInput): Promise<CreateUserResponse> {

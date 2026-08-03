@@ -117,3 +117,9 @@ export function getManageableRoles(currentRole: Role): Role[] {
     canManageRole(currentRole, role),
   );
 }
+
+export function getVisibleRoles(currentRole: Role): Role[] {
+  return (Object.values(ROLES) as Role[]).filter(
+    (role) => role === currentRole || canManageRole(currentRole, role),
+  );
+}
