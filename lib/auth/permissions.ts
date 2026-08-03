@@ -111,3 +111,9 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
 export function canManageRole(currentRole: Role, targetRole: Role): boolean {
   return roleHierarchy[currentRole] > roleHierarchy[targetRole];
 }
+
+export function getManageableRoles(currentRole: Role): Role[] {
+  return (Object.values(ROLES) as Role[]).filter((role) =>
+    canManageRole(currentRole, role),
+  );
+}
