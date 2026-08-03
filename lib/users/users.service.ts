@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/db";
 
 import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { canManageRole, hasMinRole, ROLES } from "@/lib/auth/permissions";
+import { canManageRole, hasMinRole, getManageableRoles, ROLES } from "@/lib/auth/permissions";
 import { generateTemporaryPassword } from "@/lib/utils/password";
 
 import {
@@ -87,24 +87,31 @@ export class UsersService {
   }
 
   static async getUsers(): Promise<User[]> {
-    await this.requireCurrentUser();
+    const currentUser = await this.requireCurrentUser();
 
-    return (await sql`
-      SELECT
-        u.id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.is_active,
-        r.code AS role
-      FROM users u
-      JOIN user_roles ur
-        ON ur.user_id = u.id
-      JOIN roles r
-        ON r.id = ur.role_id
-      WHERE u.deleted_at IS NULL
-      ORDER BY u.first_name, u.last_name
-    `) as User[];
+    const manageableRoles = getManageableRoles(currentUser.role);
+
+    const users = (await sql`
+    SELECT
+      u.id,
+      u.email,
+      u.first_name,
+      u.last_name,
+      u.is_active,
+      r.code AS role
+    FROM users u
+    JOIN user_roles ur
+      ON ur.user_id = u.id
+    JOIN roles r
+      ON r.id = ur.role_id
+    WHERE u.deleted_at IS NULL
+    ORDER BY u.first_name, u.last_name
+  `) as User[];
+
+    return users.filter(
+      (user) =>
+        user.id === currentUser.id || manageableRoles.includes(user.role),
+    );
   }
 
   static async createUser(data: CreateUserInput): Promise<CreateUserResponse> {
