@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { UsersTable } from "../components";
+import { UsersContent } from "../components";
 import { CreateUserDialog } from "../components/dialogs/CreateUserDialog";
 import { USERS_TEXT } from "../constants/users-text";
 
@@ -24,7 +24,7 @@ export function UsersPage() {
           <Button onClick={() => setOpen(true)}>{USERS_TEXT.create}</Button>
         </div>
 
-        <UsersTable />
+        <UsersContent />
       </div>
 
       <CreateUserDialog open={open} onOpenChange={setOpen} />

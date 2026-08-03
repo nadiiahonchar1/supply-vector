@@ -7,25 +7,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useUsers } from "../api/hooks";
-import { UserRow } from "./UserRow";
+
+import type { User } from "../types";
+
 import { USERS_TEXT } from "../constants/users-text";
+import { UserRow } from "./UserRow";
 
-export function UsersTable() {
-  const { data, isLoading, error } = useUsers();
+type Props = {
+  users: User[];
+};
 
-  if (isLoading) {
-    return <div>{USERS_TEXT.loading}</div>;
-  }
-
-  if (error) {
-    return <div>{USERS_TEXT.error}</div>;
-  }
-
-  if (!data?.length) {
-    return <div>{USERS_TEXT.empty}</div>;
-  }
-
+export function UsersTable({ users }: Props) {
   return (
     <Table>
       <TableHeader>
@@ -47,7 +39,7 @@ export function UsersTable() {
       </TableHeader>
 
       <TableBody>
-        {data.map((user) => (
+        {users.map((user) => (
           <UserRow key={user.id} user={user} />
         ))}
       </TableBody>
