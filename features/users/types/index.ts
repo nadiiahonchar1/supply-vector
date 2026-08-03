@@ -61,3 +61,15 @@ export type UpdateUserStatusRequest = {
   userId: string;
   is_active: boolean;
 };
+
+export type UsersQuery = {
+  page?: number;
+  limit?: number;
+};
+
+export type PaginatedUsersResponse = {
+  users: User[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
