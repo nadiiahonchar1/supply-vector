@@ -22,7 +22,7 @@ import type {
   CreateUserInput,
   ChangeRoleInput,
   UpdateUserStatusInput,
-  CreateUserResponse,
+  CreateUserResponse, UsersQuery, PaginatedUsersResponse
 } from "@/features/users/types";
 
 type RoleRow = {
@@ -91,12 +91,29 @@ export class UsersService {
     return users[0];
   }
 
-  static async getUsers(): Promise<User[]> {
+  static async getUsers({
+    page = 1,
+    limit = 20,
+  }: UsersQuery): Promise<PaginatedUsersResponse> {
     const currentUser = await this.requireCurrentUser();
 
     const visibleRoles = getVisibleRoles(currentUser.role);
 
-    return (await sql`
+    const offset = (page - 1) * limit;
+
+    const totalRows = (await sql`
+    SELECT COUNT(*)::int AS total
+    FROM users u
+    JOIN user_roles ur
+      ON ur.user_id = u.id
+    JOIN roles r
+      ON r.id = ur.role_id
+    WHERE
+      u.deleted_at IS NULL
+      AND r.code = ANY(${visibleRoles})
+  `) as { total: number }[];
+
+    const users = (await sql`
     SELECT
       u.id,
       u.email,
@@ -119,9 +136,20 @@ export class UsersService {
         WHEN 'manager' THEN 3
         WHEN 'operator' THEN 4
       END,
-      u.last_name ASC,
-      u.first_name ASC
+      u.last_name,
+      u.first_name
+    LIMIT ${limit}
+    OFFSET ${offset}
   `) as User[];
+
+    const total = totalRows[0].total;
+
+    return {
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   static async createUser(data: CreateUserInput): Promise<CreateUserResponse> {
