@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 
 import { requireUser } from "@/lib/auth/auth-service";
 import { UsersService } from "@/lib/users/users.service";
 import { AuditService } from "@/lib/audit/audit.service";
 import { handleApiError } from "@/lib/errors/handle-api-error";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+ const page = Number(request.nextUrl.searchParams.get("page") ?? 1);
+
+ const limit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
   try {
-    const users = await UsersService.getUsers();
+    const users = await UsersService.getUsers({
+      page,
+      limit,
+    });
 
     return NextResponse.json(users);
   } catch (error) {

@@ -1,10 +1,19 @@
 "use client";
 
+import { useState } from "react";
+
 import { useUsers } from "../api/hooks";
+
 import { USERS_TEXT } from "../constants/users-text";
+
 import { UsersTable } from "./UsersTable";
+
+import { PaginationBar } from "./PaginationBar";
+
 export function UsersContent() {
-  const { data, isLoading, error } = useUsers();
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, error } = useUsers(page);
 
   if (isLoading) {
     return <div>{USERS_TEXT.loading}</div>;
@@ -14,9 +23,18 @@ export function UsersContent() {
     return <div>{USERS_TEXT.error}</div>;
   }
 
-  if (!data?.length) {
+  if (!data || !data.users.length) {
     return <div>{USERS_TEXT.empty}</div>;
   }
 
-  return <UsersTable users={data} />;
+  return (
+    <>
+      <UsersTable users={data.users} />
+      <PaginationBar
+        page={page}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+      />
+    </>
+  );
 }

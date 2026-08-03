@@ -6,12 +6,15 @@ import type {
   CreateUserResponse,
   ChangeRoleInput,
   UpdateUserStatusInput,
+  PaginatedUsersResponse,
 } from "../types";
 
 export const usersApi = {
-  getUsers() {
-    return apiClient.get<User[]>("/api/users");
-  },
+  getUsers(page = 1, limit = 20): Promise<PaginatedUsersResponse> {
+    return apiClient.get<PaginatedUsersResponse>(
+      `/api/users?page=${page}&limit=${limit}`,
+    );
+    },
 
   createUser(data: CreateUserInput) {
     return apiClient.post<CreateUserResponse>("/api/users", data);
