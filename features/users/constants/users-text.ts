@@ -1,5 +1,3 @@
-import { forbidden } from "next/navigation";
-
 export const USERS_TEXT = {
   title: "Користувачі",
   subtitle: "Керуйте користувачами системи та їхніми ролями.",
