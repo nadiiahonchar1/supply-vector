@@ -25,6 +25,8 @@ import type {
   CreateUserResponse, UsersQuery, PaginatedUsersResponse
 } from "@/features/users/types";
 
+import { USERS_TEXT } from "@/features/users";
+
 type RoleRow = {
   id: string;
 };
@@ -58,7 +60,7 @@ export class UsersService {
     `) as RoleRow[];
 
     if (!roles.length) {
-      throw new ValidationError("Роль не знайдена");
+      throw new ValidationError(USERS_TEXT.error.empty_role);
     }
 
     return roles[0].id;
@@ -85,7 +87,7 @@ export class UsersService {
   `) as UserWithRole[];
 
     if (!users.length) {
-      throw new NotFoundError("Користувача не знайдено");
+      throw new NotFoundError(USERS_TEXT.error.empty_user);
     }
 
     return users[0];
@@ -157,7 +159,7 @@ export class UsersService {
 
     if (!canManageRole(currentUser.role, data.role)) {
       throw new ForbiddenError(
-        "Недостатньо прав для створення користувача з цією роллю",
+        USERS_TEXT.error.forbidded_permission_create
       );
     }
 
@@ -169,7 +171,7 @@ export class UsersService {
   `) as { id: string }[];
 
     if (existing.length) {
-      throw new ValidationError("Користувач з таким email вже існує");
+      throw new ValidationError(USERS_TEXT.error.email);
     }
 
     const temporaryPassword = generateTemporaryPassword();
@@ -282,7 +284,7 @@ export class UsersService {
 
     if (!canManageRole(currentUser.role, targetUser.role)) {
       throw new ForbiddenError(
-        "Недостатньо прав для зміни статусу цього користувача",
+        USERS_TEXT.error.forbidden_permission_change,
       );
     }
 

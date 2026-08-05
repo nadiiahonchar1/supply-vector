@@ -58,7 +58,7 @@ export function ChangeRoleForm({ user, onSuccess }: Props) {
         role: data.role,
       });
 
-      toast.success("Роль користувача успішно змінена");
+      toast.success(USERS_TEXT.success_dialog.success_role);
 
       onSuccess();
     } catch {}

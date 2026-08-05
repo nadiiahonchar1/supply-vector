@@ -25,8 +25,8 @@ export function ChangeUserStatusForm({ user, onSuccess }: Props) {
 
     toast.success(
       user.is_active
-        ? "Користувача успішно деактивовано"
-        : "Користувача успішно активовано",
+        ? USERS_TEXT.success_dialog.success_deactivate
+        : USERS_TEXT.success_dialog.success_activate,
     );
 
     onSuccess();
@@ -36,8 +36,8 @@ export function ChangeUserStatusForm({ user, onSuccess }: Props) {
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         {user.is_active
-          ? "Ви дійсно бажаєте деактивувати цього користувача?"
-          : "Ви дійсно бажаєте активувати цього користувача?"}
+          ? USERS_TEXT.actions.action_deactivate
+          : USERS_TEXT.actions.action_activate}
       </p>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}

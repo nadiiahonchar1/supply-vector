@@ -20,11 +20,11 @@ export function UsersContent() {
   }
 
   if (error) {
-    return <div>{USERS_TEXT.error}</div>;
+    return <div>{USERS_TEXT.error.loading}</div>;
   }
 
   if (!data || !data.users.length) {
-    return <div>{USERS_TEXT.empty}</div>;
+    return <div>{USERS_TEXT.error.empty_user}</div>;
   }
 
   return (
