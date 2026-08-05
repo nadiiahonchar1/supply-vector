@@ -2,20 +2,21 @@ import bcrypt from "bcryptjs";
 
 import { sql } from "@/db";
 
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getCurrentUser } from "@/lib/auth/server";
 import {
   canManageRole,
   hasMinRole,
   getVisibleRoles,
   ROLES,
-} from "@/lib/auth/permissions";
-import { generateTemporaryPassword } from "@/lib/utils/password";
+} from "@/lib/auth";
+import { generateTemporaryPassword } from "@/lib/utils";
+
 
 import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
-} from "@/lib/errors/errors";
+} from "@/lib/errors";
 
 import type {
   User,
@@ -23,7 +24,7 @@ import type {
   ChangeRoleInput,
   UpdateUserStatusInput,
   CreateUserResponse, UsersQuery, PaginatedUsersResponse
-} from "@/features/users/types";
+} from "@/features/users";
 
 import { USERS_TEXT } from "@/features/users";
 

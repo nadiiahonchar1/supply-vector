@@ -2,25 +2,21 @@
 
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
 import {
+  Button,
+  Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui";
 
-import { ROLES } from "@/lib/auth/permissions";
+import { ROLES } from "@/lib/auth";
 
 import { USERS_TEXT } from "../../constants/users-text";
 import { createUserSchema } from "../../validation/user.schema";
-
 import type { CreateUserInput } from "../../types";
-
 import { useCreateUser } from "../../api";
 
 type Props = {

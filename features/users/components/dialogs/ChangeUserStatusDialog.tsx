@@ -5,10 +5,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-
+} from "@/components/ui";
 import type { User } from "../../types";
-
 import { USERS_TEXT } from "../../constants/users-text";
 import { ChangeUserStatusForm } from "../forms";
 

@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-
-import { UsersContent } from "../components";
-import { CreateUserDialog } from "../components/dialogs/CreateUserDialog";
+import { Button } from "@/components/ui";
+import { UsersContent, CreateUserDialog } from "../components";
 import { USERS_TEXT } from "../constants/users-text";
 
 export function UsersPage() {

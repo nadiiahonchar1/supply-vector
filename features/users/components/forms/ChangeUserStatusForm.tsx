@@ -1,12 +1,9 @@
 "use client";
 
 import toast from "react-hot-toast";
-
-import { Button } from "@/components/ui/button";
-
+import { Button } from "@/components/ui";
 import { useUpdateUserStatus } from "../../api";
 import { USERS_TEXT } from "../../constants/users-text";
-
 import type { User } from "../../types";
 
 type Props = {

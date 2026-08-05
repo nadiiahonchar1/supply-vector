@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui";
 import { USERS_TEXT } from "../constants/users-text";
 
 type Props = {

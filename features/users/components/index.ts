@@ -8,3 +8,4 @@ export * from "./dialogs";
 export * from "./forms";
 export * from "./UsersContent";
 export * from "./PaginationBar";
+export * from './GroupHeaderRow';

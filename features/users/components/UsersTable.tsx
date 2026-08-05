@@ -8,14 +8,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-
+} from "@/components/ui";
 import { USERS_TEXT } from "../constants/users-text";
-
 import type { User } from "../types";
-
-import { GroupHeaderRow } from "./UsersTable/GroupHeaderRow";
-import { UserRow } from "./UserRow";
+import { UserRow, GroupHeaderRow } from "../components";
 
 type Props = {
   users: User[];

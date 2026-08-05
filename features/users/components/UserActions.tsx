@@ -2,16 +2,14 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
-
-import { Button } from "@/components/ui/button";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
+} from "@/components/ui";
 import { USERS_TEXT } from "../constants/users-text";
 import { ChangeRoleDialog, ChangeUserStatusDialog } from "./dialogs";
 

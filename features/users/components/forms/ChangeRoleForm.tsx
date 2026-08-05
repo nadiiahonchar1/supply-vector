@@ -3,19 +3,16 @@
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-
-import { Button } from "@/components/ui/button";
 import {
+  Button,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-
-import { ROLES, canManageRole } from "@/lib/auth/permissions";
+} from "@/components/ui";
+import { ROLES, canManageRole } from "@/lib/auth";
 import { useAuth } from "@/features/auth";
-
 import { USERS_TEXT } from "../../constants/users-text";
 import { changeRoleSchema } from "../../validation/user.schema";
 import { useChangeRole } from "../../api";

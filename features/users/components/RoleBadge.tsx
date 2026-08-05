@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui";
 import type { Role } from "@/features/auth";
 import { USERS_TEXT } from "../constants/users-text";
 
