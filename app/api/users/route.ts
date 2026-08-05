@@ -1,9 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { UsersService } from "@/lib/users/users.service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { requireUser } from "@/lib/auth";
+import { UsersService } from "@/lib/users";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
  const page = Number(request.nextUrl.searchParams.get("page") ?? 1);

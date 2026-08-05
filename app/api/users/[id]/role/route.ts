@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { UsersService } from "@/lib/users/users.service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { UsersService } from "@/lib/users";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 
 type Params = {
   params: Promise<{
