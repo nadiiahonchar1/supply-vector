@@ -4,11 +4,13 @@ import { requireUser } from "@/lib/auth/server";
 import { UsersService } from "@/lib/users";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
+import { validate } from "@/lib/validation";
+import { createUserSchema } from "@/features/users/validation/user.schema";
 
 export async function GET(request: NextRequest) {
- const page = Number(request.nextUrl.searchParams.get("page") ?? 1);
+  const page = Number(request.nextUrl.searchParams.get("page") ?? 1);
 
- const limit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
+  const limit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
   try {
     const users = await UsersService.getUsers({
       page,
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const input = await req.json();
+    const input = validate(createUserSchema, await req.json());
 
     const currentUser = await requireUser();
 

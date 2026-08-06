@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth/server";
 import { UsersService } from "@/lib/users";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
+import { validate } from "@/lib/validation";
+import { changeRoleSchema } from "@/features/users/validation/user.schema";
 
 type Params = {
   params: Promise<{
@@ -15,7 +17,7 @@ export async function PATCH(req: Request, { params }: Params) {
   try {
     const { id } = await params;
 
-    const body = await req.json();
+    const body = validate(changeRoleSchema, await req.json());
 
     const currentUser = await requireUser();
 
