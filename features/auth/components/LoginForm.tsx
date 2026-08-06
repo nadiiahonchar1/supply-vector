@@ -1,20 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useLogin } from "../api/hooks/useLogin";
+import { useLogin } from "../api/hooks";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginFormData } from "../validation/login.schema";
-import { Button } from "@/components/ui/button";
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  Input,
+  Label,
+} from "@/components/ui";
+import { AUTH_TEXT } from "../constants/auth-text";
 
 export function LoginForm() {
   const { login } = useLogin();
@@ -38,22 +39,22 @@ export function LoginForm() {
       setServerError("");
       await login(values);
     } catch {
-      setServerError("Invalid email or password");
+      setServerError(AUTH_TEXT.error.invalid);
     }
   }
 
   return (
     <Card className="mx-auto w-full max-w-md">
       <CardHeader>
-        <CardTitle>Sign in</CardTitle>
+        <CardTitle>{AUTH_TEXT.dialog.title}</CardTitle>
 
-        <CardDescription>Enter your credentials to continue.</CardDescription>
+        <CardDescription>{AUTH_TEXT.dialog.description}</CardDescription>
       </CardHeader>
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{AUTH_TEXT.dialog.email}</Label>
 
             <Input
               id="email"
@@ -69,7 +70,7 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{AUTH_TEXT.dialog.password}</Label>
 
             <Input
               id="password"
@@ -90,7 +91,9 @@ export function LoginForm() {
           )}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting
+              ? AUTH_TEXT.dialog.submitting
+              : AUTH_TEXT.dialog.submit}
           </Button>
         </form>
       </CardContent>

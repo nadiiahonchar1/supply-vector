@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { logoutUser, requireUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 
 export async function POST() {
   try {

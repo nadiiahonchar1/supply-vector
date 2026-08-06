@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { loginUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 
 export async function POST(req: Request) {
   try {

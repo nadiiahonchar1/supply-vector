@@ -17,11 +17,4 @@ function logout() {
   return apiClient.post<{ success: boolean }>("/api/auth/logout");
 }
 
-// function changePassword(data: ChangePasswordInput) {
-//   return apiClient.post<{ success: boolean }>(
-//     "/api/auth/change-password",
-//     data,
-//   );
-// }
-
 export { login, logout, me };

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/auth-service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { handleApiError } from "@/lib/errors";
 
 export async function GET() {
   try {

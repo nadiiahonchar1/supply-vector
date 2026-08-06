@@ -5,6 +5,7 @@ import { createSession, deleteSession } from "./session";
 import { getCurrentUser } from "./get-current-user";
 import {rolePermissions} from "./permissions";
 import type { Role, Permission } from "@/features/auth/types";
+import { AUTH_TEXT } from "@/features/auth/constants/auth-text";
 
 // =====================================
 // LOGIN
@@ -24,13 +25,13 @@ export async function loginUser(email: string, password: string) {
   const user = users[0];
 
   if (!user || !user.is_active) {
-    throw new Error("Invalid credentials");
+    throw new Error(AUTH_TEXT.error.credentials);
   }
 
   const isValid = await verifyPassword(password, user.password_hash);
 
   if (!isValid) {
-    throw new Error("Invalid credentials");
+    throw new Error(AUTH_TEXT.error.credentials);
   }
 
   await sql`
@@ -72,7 +73,7 @@ export async function requireUser() {
   const user = await getCurrentUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new Error(AUTH_TEXT.error.unauthorized);
   }
 
   return user;
@@ -99,6 +100,6 @@ export function requirePermission(role: Role, permission: Permission) {
   const allowed = checkPermission(role, permission);
 
   if (!allowed) {
-    throw new Error("Forbidden");
+    throw new Error(AUTH_TEXT.error.forbidden);
   }
 }

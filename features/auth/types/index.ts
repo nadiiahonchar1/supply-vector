@@ -13,11 +13,6 @@ export type LoginInput = {
   password: string;
 };
 
-// export type LoginResponse = {
-//   userId: string;
-//   email: string;
-//   sessionToken: string;
-// };
 export type LoginResponse = {
   userId: string;
   email: string;
