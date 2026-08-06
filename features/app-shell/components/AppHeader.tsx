@@ -1,8 +1,8 @@
 "use client";
 
-import { SidebarTrigger } from "@/components/ui/sidebar";
-
+import { SidebarTrigger } from "@/components/ui";
 import { UserMenu } from "./UserMenu";
+import { APP_SHELL_TEXT } from "../constants/app-shell-text";
 
 export function AppHeader() {
   return (
@@ -10,7 +10,7 @@ export function AppHeader() {
       <div className="flex items-center gap-3">
         <SidebarTrigger />
 
-        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <h1 className="text-lg font-semibold">{APP_SHELL_TEXT.title}</h1>
       </div>
 
       <UserMenu />

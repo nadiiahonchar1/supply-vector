@@ -1,4 +1,4 @@
-import type { CurrentUser } from "../types";
+import type { CurrentUser } from "../../features/auth/types";
 
 export function getUserFullName(user: CurrentUser) {
   return `${user.first_name} ${user.last_name}`;

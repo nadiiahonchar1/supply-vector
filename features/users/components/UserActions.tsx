@@ -46,14 +46,14 @@ export function UserActions({ user }: Props) {
 
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={openRoleDialog}>
-            {USERS_TEXT.actions.changeRole}
+            {USERS_TEXT.actions.change_role}
           </DropdownMenuItem>
 
           <DropdownMenuItem disabled>
-            {USERS_TEXT.actions.assignStores}
+            {USERS_TEXT.actions.assign_stores}
 
             <span className="ml-auto rounded bg-muted px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-              {USERS_TEXT.actions.comingSoon}
+              {USERS_TEXT.actions.coming_soon}
             </span>
           </DropdownMenuItem>
 

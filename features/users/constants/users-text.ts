@@ -6,8 +6,8 @@ export const USERS_TEXT = {
   creating: "Створення користувача",
 
   table: {
-    firstName: "Ім'я",
-    lastName: "Прізвище",
+    first_name: "Ім'я",
+    last_name: "Прізвище",
     email: "Email",
     role: "Роль",
     status: "Статус",
@@ -27,12 +27,12 @@ export const USERS_TEXT = {
   },
 
   actions: {
-    changeRole: "Змінити роль",
-    assignStores: "Призначити магазини",
+    change_role: "Змінити роль",
+    assign_stores: "Призначити магазини",
     activate: "Активувати",
     deactivate: "Деактивувати",
-    resetPassword: "Скинути пароль",
-    comingSoon: "Скоро",
+    reset_password: "Скинути пароль",
+    coming_soon: "Скоро",
     action_activate: "Ви дійсно бажаєте активувати цього користувача?",
     action_deactivate: "Ви дійсно бажаєте деактивувати цього користувача?",
   },

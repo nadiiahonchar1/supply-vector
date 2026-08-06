@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
-import { getUserInitials } from "@/features/auth/utils/user";
+import { getUserInitials } from "@/lib/utils/user";
 
 import type { Profile } from "../types";
 

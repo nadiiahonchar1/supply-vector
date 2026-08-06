@@ -65,7 +65,7 @@ export function CreateUserForm({ onSuccess }: Props) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="space-y-2">
-        <label>{USERS_TEXT.table.firstName}</label>
+        <label>{USERS_TEXT.table.first_name}</label>
 
         <Input {...register("first_name")} />
 
@@ -77,7 +77,7 @@ export function CreateUserForm({ onSuccess }: Props) {
       </div>
 
       <div className="space-y-2">
-        <label>{USERS_TEXT.table.lastName}</label>
+        <label>{USERS_TEXT.table.last_name}</label>
 
         <Input {...register("last_name")} />
 

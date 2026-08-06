@@ -58,9 +58,9 @@ export function UsersTable({ users }: Props) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>{USERS_TEXT.table.firstName}</TableHead>
+          <TableHead>{USERS_TEXT.table.first_name}</TableHead>
 
-          <TableHead>{USERS_TEXT.table.lastName}</TableHead>
+          <TableHead>{USERS_TEXT.table.last_name}</TableHead>
 
           <TableHead>{USERS_TEXT.table.email}</TableHead>
 

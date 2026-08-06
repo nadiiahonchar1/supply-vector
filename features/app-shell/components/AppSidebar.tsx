@@ -6,9 +6,10 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@/components/ui";
 import { APP_NAME } from "../config/app";
 import { AppSidebarNav } from "./AppSidebarNav";
+import { APP_SHELL_TEXT } from "../constants/app-shell-text";
 
 export function AppSidebar() {
   return (
@@ -24,7 +25,9 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t">
-        <div className="p-4 text-xs text-muted-foreground">v1.0.0</div>
+        <div className="p-4 text-xs text-muted-foreground">
+          {APP_SHELL_TEXT.footer}
+        </div>
       </SidebarFooter>
 
       <SidebarRail />

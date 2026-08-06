@@ -94,7 +94,7 @@ export function ChangeRoleForm({ user, onSuccess }: Props) {
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? USERS_TEXT.loading : USERS_TEXT.actions.changeRole}
+        {isPending ? USERS_TEXT.loading : USERS_TEXT.actions.change_role}
       </Button>
     </form>
   );

@@ -21,7 +21,7 @@ export function ChangeRoleDialog({ user, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{USERS_TEXT.actions.changeRole}</DialogTitle>
+          <DialogTitle>{USERS_TEXT.actions.change_role}</DialogTitle>
         </DialogHeader>
 
         <ChangeRoleForm user={user} onSuccess={() => onOpenChange(false)} />

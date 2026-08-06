@@ -2,22 +2,19 @@
 
 import Link from "next/link";
 import { LogOut, User } from "lucide-react";
-
-import { useAuth } from "@/features/auth/context/useAuth";
-import { useLogout } from "@/features/auth/api/hooks/useLogout";
-import { getUserFullName, getUserInitials } from "@/features/auth/utils/user";
-import { getRoleLabel } from "@/features/auth/constants/role-labels";
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
+import { useAuth, useLogout, getRoleLabel } from "@/features/auth";
+import { getUserFullName, getUserInitials } from "@/lib/utils";
 import {
+  Avatar,
+  AvatarFallback,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui";
+import { APP_SHELL_TEXT } from "../constants/app-shell-text";
 
 export function UserMenu() {
   const { user } = useAuth();
@@ -53,7 +50,7 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/profile">
             <User className="mr-2 size-4" />
-            Профіль
+            {APP_SHELL_TEXT.user_menu.profile}
           </Link>
         </DropdownMenuItem>
 
@@ -61,7 +58,7 @@ export function UserMenu() {
 
         <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 size-4" />
-          Вийти
+          {APP_SHELL_TEXT.user_menu.logout}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
