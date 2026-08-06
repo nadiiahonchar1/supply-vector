@@ -1,10 +1,13 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Badge,
+} from "@/components/ui";
 import { PROFILE_TEXT } from "../constants/profile-text";
-
 import type { Profile } from "../types";
 
 type ProfileInfoCardProps = {

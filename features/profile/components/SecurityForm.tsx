@@ -3,9 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-
-import { useChangePassword } from "../api/hooks/useChangePassword";
-
+import { useChangePassword } from "../api/hooks";
 import { changePasswordFormSchema } from "../validation/password.schema";
 import type { ChangePasswordFormValues } from "../types";
 import { PROFILE_TEXT } from "../constants/profile-text";
@@ -30,7 +28,7 @@ export function SecurityForm() {
 
     reset();
 
-    toast.success("Password changed");
+    toast.success(PROFILE_TEXT.toast_masages.succes_change);
   }
 
   return (

@@ -1,17 +1,18 @@
 import { z } from "zod";
+import { PROFILE_TEXT } from "../constants/profile-text";
 
 export const updateProfileSchema = z.object({
   first_name: z
     .string()
     .trim()
-    .min(2, "Ім'я повинно містити щонайменше 2 символи.")
-    .max(50, "Ім'я має містити менше ніж 50 символів."),
+    .min(2, PROFILE_TEXT.schema.first_name_min)
+    .max(50, PROFILE_TEXT.schema.first_name_max),
 
   last_name: z
     .string()
     .trim()
-    .min(2, "Прізвище повинно містити щонайменше 2 символи.")
-    .max(50, "Прізвище має містити менше ніж 50 символів."),
+    .min(2, PROFILE_TEXT.schema.last_name_min)
+    .max(50, PROFILE_TEXT.schema.last_name_max),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

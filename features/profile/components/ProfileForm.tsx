@@ -4,11 +4,9 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-
-import { useAuth } from "@/features/auth/context/useAuth";
-import { useUpdateProfile } from "../api/hooks/useUpdateProfile";
+import { useAuth } from "@/features/auth";
+import { useUpdateProfile } from "../api/hooks";
 import { PROFILE_TEXT } from "../constants/profile-text";
-
 import {
   updateProfileSchema,
   type UpdateProfileInput,

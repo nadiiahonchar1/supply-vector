@@ -1,10 +1,11 @@
 "use client";
 
-import { ProfileHeader } from "./ProfileHeader";
-import { ProfileInfoCard } from "./ProfileInfoCard";
-import { ProfileForm } from "./ProfileForm";
-import { SecurityForm } from "./SecurityForm";
-
+import {
+  ProfileHeader,
+  ProfileInfoCard,
+  ProfileForm,
+  SecurityForm,
+} from "../components";
 import type { Profile } from "../types";
 
 type ProfilePageProps = {

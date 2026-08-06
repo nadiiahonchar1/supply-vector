@@ -1,9 +1,7 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-
-import { getUserInitials } from "@/lib/utils/user";
+import { Avatar, AvatarFallback, Badge } from "@/components/ui";
+import { getUserInitials } from "@/lib/utils";
 
 import type { Profile } from "../types";
 

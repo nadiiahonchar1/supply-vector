@@ -7,7 +7,8 @@ import {
   UnauthorizedError,
   ValidationError,
   NotFoundError,
-} from "@/lib/errors/errors";
+} from "@/lib/errors";
+import { PROFILE_TEXT } from "@/features/profile/constants/profile-text";
 
 export type UpdateProfileDto = {
   first_name: string;
@@ -66,7 +67,7 @@ export class ProfileService {
     const currentPasswordHash = users[0]?.password_hash;
 
     if (!currentPasswordHash) {
-      throw new NotFoundError("Користувача не знайдено");
+      throw new NotFoundError(PROFILE_TEXT.error.not_found);
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(
@@ -75,7 +76,7 @@ export class ProfileService {
     );
 
     if (!isCurrentPasswordValid) {
-      throw new ValidationError("Поточний пароль неправильний");
+      throw new ValidationError(PROFILE_TEXT.error.wrong);
     }
 
     const sameAsCurrent = await bcrypt.compare(
@@ -85,7 +86,7 @@ export class ProfileService {
 
     if (sameAsCurrent) {
       throw new ValidationError(
-        "Новий пароль повинен відрізнятися від поточного",
+        PROFILE_TEXT.error.not_new
       );
     }
 
@@ -105,7 +106,7 @@ export class ProfileService {
 
       if (alreadyUsed) {
         throw new ValidationError(
-          "Не можна використовувати один із останніх 5 паролів",
+          PROFILE_TEXT.error.in_top_five
         );
       }
     }
