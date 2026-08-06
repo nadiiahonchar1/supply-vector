@@ -8,22 +8,20 @@ import {
   hasMinRole,
   getVisibleRoles,
   ROLES,
+  RolePolicy,
 } from "@/lib/auth";
 import { generateTemporaryPassword } from "@/lib/utils";
 
-
-import {
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from "@/lib/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type {
   User,
   CreateUserInput,
   ChangeRoleInput,
   UpdateUserStatusInput,
-  CreateUserResponse, UsersQuery, PaginatedUsersResponse
+  CreateUserResponse,
+  UsersQuery,
+  PaginatedUsersResponse,
 } from "@/features/users";
 
 import { USERS_TEXT } from "@/features/users";
@@ -159,9 +157,7 @@ export class UsersService {
     const currentUser = await this.requireCurrentUser();
 
     if (!canManageRole(currentUser.role, data.role)) {
-      throw new ForbiddenError(
-        USERS_TEXT.error.forbidded_permission_create
-      );
+      throw new ForbiddenError(USERS_TEXT.error.forbidded_permission_create);
     }
 
     const existing = (await sql`
@@ -254,11 +250,13 @@ export class UsersService {
   static async changeRole(id: string, data: ChangeRoleInput): Promise<User> {
     const currentUser = await this.requireCurrentUser();
 
-    if (!canManageRole(currentUser.role, data.role)) {
+    const targetUser = await this.getUserWithRole(id);
+
+    if (
+      !RolePolicy.canChangeUserRole(currentUser, targetUser.role, data.role)
+    ) {
       throw new ForbiddenError();
     }
-
-    await this.getUserWithRole(id);
 
     const roleId = await this.getRoleId(data.role);
 
@@ -284,9 +282,7 @@ export class UsersService {
     const targetUser = await this.getUserWithRole(id);
 
     if (!canManageRole(currentUser.role, targetUser.role)) {
-      throw new ForbiddenError(
-        USERS_TEXT.error.forbidden_permission_change,
-      );
+      throw new ForbiddenError(USERS_TEXT.error.forbidden_permission_change);
     }
 
     await sql`
