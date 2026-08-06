@@ -24,7 +24,7 @@ export const PROFILE_TEXT = {
 
   toast_masages: {
     success: "Профіль оновлено",
-    succes_change: "Парось змінено",
+    succes_change: "Пароль змінено",
   },
 
   schema: {
