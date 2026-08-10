@@ -1,8 +1,6 @@
-import bcrypt from "bcryptjs";
-
 import { sql } from "@/db";
 
-import { getCurrentUser } from "@/lib/auth/server";
+import { getCurrentUser, hashPassword } from "@/lib/auth/server";
 import {
   canManageRole,
   hasMinRole,
@@ -174,7 +172,7 @@ export class UsersService {
     const roleId = await this.getRoleId(data.role);
 
     const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    const passwordHash = await hashPassword(temporaryPassword);
 
     const userId = crypto.randomUUID();
 

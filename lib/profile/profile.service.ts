@@ -1,7 +1,6 @@
-import bcrypt from "bcryptjs";
-
 import { sql } from "@/db";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { hashPassword, verifyPassword } from "@/lib/auth/server";
 import type { CurrentUser } from "@/features/auth/types";
 import {
   UnauthorizedError,
@@ -70,7 +69,7 @@ export class ProfileService {
       throw new NotFoundError(PROFILE_TEXT.error.not_found);
     }
 
-    const isCurrentPasswordValid = await bcrypt.compare(
+    const isCurrentPasswordValid = await verifyPassword(
       data.currentPassword,
       currentPasswordHash,
     );
@@ -79,15 +78,13 @@ export class ProfileService {
       throw new ValidationError(PROFILE_TEXT.error.wrong);
     }
 
-    const sameAsCurrent = await bcrypt.compare(
+    const sameAsCurrent = await verifyPassword(
       data.newPassword,
       currentPasswordHash,
     );
 
     if (sameAsCurrent) {
-      throw new ValidationError(
-        PROFILE_TEXT.error.not_new
-      );
+      throw new ValidationError(PROFILE_TEXT.error.not_new);
     }
 
     const previousPasswords = (await sql`
@@ -99,19 +96,17 @@ export class ProfileService {
     `) as { password_hash: string }[];
 
     for (const previous of previousPasswords) {
-      const alreadyUsed = await bcrypt.compare(
+      const alreadyUsed = await verifyPassword(
         data.newPassword,
         previous.password_hash,
       );
 
       if (alreadyUsed) {
-        throw new ValidationError(
-          PROFILE_TEXT.error.in_top_five
-        );
+        throw new ValidationError(PROFILE_TEXT.error.in_top_five);
       }
     }
 
-    const newPasswordHash = await bcrypt.hash(data.newPassword, 12);
+    const newPasswordHash = await hashPassword(data.newPassword);
 
     await sql`
       UPDATE users
