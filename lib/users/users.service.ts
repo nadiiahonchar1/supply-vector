@@ -171,72 +171,75 @@ export class UsersService {
       throw new ValidationError(USERS_TEXT.error.email);
     }
 
+    const roleId = await this.getRoleId(data.role);
+
     const temporaryPassword = generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
-    const users = (await sql`
-    INSERT INTO users (
-      email,
-      first_name,
-      last_name,
-      password_hash,
-      is_active,
-      created_by
-    )
-    VALUES (
-      ${data.email},
-      ${data.first_name},
-      ${data.last_name},
-      ${passwordHash},
-      true,
-      ${currentUser.id}
-    )
-    RETURNING
-      id,
-      email,
-      first_name,
-      last_name,
-      is_active
-  `) as Omit<User, "role">[];
+    const userId = crypto.randomUUID();
 
-    const user = users[0];
+    const [insertedUsers] = (await sql.transaction([
+      sql`
+      INSERT INTO users (
+        id,
+        email,
+        first_name,
+        last_name,
+        password_hash,
+        is_active,
+        created_by
+      )
+      VALUES (
+        ${userId},
+        ${data.email},
+        ${data.first_name},
+        ${data.last_name},
+        ${passwordHash},
+        true,
+        ${currentUser.id}
+      )
+      RETURNING
+        id,
+        email,
+        first_name,
+        last_name,
+        is_active
+    `,
+      sql`
+      INSERT INTO user_roles (
+        user_id,
+        role_id
+      )
+      VALUES (
+        ${userId},
+        ${roleId}
+      )
+    `,
+      sql`
+      INSERT INTO password_history (
+        user_id,
+        password_hash
+      )
+      VALUES (
+        ${userId},
+        ${passwordHash}
+      )
+    `,
+      sql`
+      INSERT INTO password_resets (
+        user_id,
+        token,
+        expires_at
+      )
+      VALUES (
+        ${userId},
+        ${crypto.randomUUID()},
+        NOW() + INTERVAL '365 days'
+      )
+    `,
+    ])) as [Omit<User, "role">[], unknown, unknown, unknown];
 
-    const roleId = await this.getRoleId(data.role);
-
-    await sql`
-    INSERT INTO user_roles (
-      user_id,
-      role_id
-    )
-    VALUES (
-      ${user.id},
-      ${roleId}
-    )
-  `;
-
-    await sql`
-    INSERT INTO password_history (
-      user_id,
-      password_hash
-    )
-    VALUES (
-      ${user.id},
-      ${passwordHash}
-    )
-  `;
-
-    await sql`
-    INSERT INTO password_resets (
-      user_id,
-      token,
-      expires_at
-    )
-    VALUES (
-      ${user.id},
-      ${crypto.randomUUID()},
-      NOW() + INTERVAL '365 days'
-    )
-  `;
+    const user = insertedUsers[0];
 
     return {
       user: {
