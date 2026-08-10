@@ -20,11 +20,13 @@ export const PROFILE_TEXT = {
     new_password: "Новий пароль",
     confirm_password: "Повторіть новий пароль",
     change: "Змінити пароль",
+    force_change_notice:
+      "Це ваш перший вхід із тимчасовим паролем. Будь ласка, встановіть новий пароль, щоб продовжити.",
   },
 
   toast_masages: {
     success: "Профіль оновлено",
-    succes_change: "Пароль змінено",
+    succes_change: "Парось змінено",
   },
 
   schema: {

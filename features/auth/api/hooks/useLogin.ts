@@ -11,7 +11,12 @@ export function useLogin() {
   async function signIn(data: LoginInput) {
     const result = await login(data);
 
-    router.replace("/");
+    if (result.mustChangePassword) {
+      router.replace("/profile?forceChange=1");
+    } else {
+      router.replace("/");
+    }
+
     router.refresh();
 
     return result;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
@@ -9,6 +10,7 @@ import type { ChangePasswordFormValues } from "../types";
 import { PROFILE_TEXT } from "../constants/profile-text";
 
 export function SecurityForm() {
+  const router = useRouter();
   const { changePassword } = useChangePassword();
 
   const {
@@ -29,6 +31,8 @@ export function SecurityForm() {
     reset();
 
     toast.success(PROFILE_TEXT.toast_masages.succes_change);
+
+    router.replace("/profile");
   }
 
   return (
