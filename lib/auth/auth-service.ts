@@ -3,9 +3,27 @@ import { sql } from "@/db";
 import { verifyPassword } from "./password";
 import { createSession, deleteSession } from "./session";
 import { getCurrentUser } from "./get-current-user";
-import {rolePermissions} from "./permissions";
+import { rolePermissions } from "./permissions";
 import type { Role, Permission } from "@/features/auth/types";
 import { AUTH_TEXT } from "@/features/auth/constants/auth-text";
+
+// =====================================
+// PENDING PASSWORD RESET CHECK
+// =====================================
+export async function hasPendingPasswordReset(
+  userId: string,
+): Promise<boolean> {
+  const passwordReset = (await sql`
+    SELECT id
+    FROM password_resets
+    WHERE user_id = ${userId}
+      AND used_at IS NULL
+      AND expires_at > NOW()
+    LIMIT 1
+  `) as { id: string }[];
+
+  return passwordReset.length > 0;
+}
 
 // =====================================
 // LOGIN
@@ -42,20 +60,13 @@ export async function loginUser(email: string, password: string) {
 
   const sessionToken = await createSession(user.id);
 
-  const passwordReset = (await sql`
-    SELECT id
-    FROM password_resets
-    WHERE user_id = ${user.id}
-      AND used_at IS NULL
-      AND expires_at > NOW()
-    LIMIT 1
-  `) as { id: string }[];
+  const mustChangePassword = await hasPendingPasswordReset(user.id);
 
   return {
     userId: user.id,
     email: user.email,
     sessionToken,
-    mustChangePassword: passwordReset.length > 0,
+    mustChangePassword,
   };
 }
 
