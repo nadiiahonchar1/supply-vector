@@ -6,12 +6,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { sql } from "./index";
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
-async function ensureMigrationsTable() {
+type SqlClient = (typeof import("./index"))["sql"];
+
+async function ensureMigrationsTable(sql: SqlClient) {
   await sql`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id TEXT PRIMARY KEY,
@@ -20,7 +20,7 @@ async function ensureMigrationsTable() {
   `;
 }
 
-async function getAppliedMigrations(): Promise<Set<string>> {
+async function getAppliedMigrations(sql: SqlClient): Promise<Set<string>> {
   const rows = (await sql`
     SELECT id FROM schema_migrations
   `) as { id: string }[];
@@ -36,9 +36,12 @@ function splitStatements(fileContent: string): string[] {
 }
 
 async function run() {
-  await ensureMigrationsTable();
+ 
+  const { sql } = await import("./index");
 
-  const applied = await getAppliedMigrations();
+  await ensureMigrationsTable(sql);
+
+  const applied = await getAppliedMigrations(sql);
 
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith(".sql"))
