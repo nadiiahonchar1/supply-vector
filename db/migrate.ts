@@ -28,8 +28,18 @@ async function getAppliedMigrations(sql: SqlClient): Promise<Set<string>> {
   return new Set(rows.map((row) => row.id));
 }
 
-function splitStatements(fileContent: string): string[] {
+function stripLineComments(fileContent: string): string {
   return fileContent
+    .split("\n")
+    .map((line) => {
+      const commentIndex = line.indexOf("--");
+      return commentIndex === -1 ? line : line.slice(0, commentIndex);
+    })
+    .join("\n");
+}
+
+function splitStatements(fileContent: string): string[] {
+  return stripLineComments(fileContent)
     .split(";")
     .map((statement) => statement.trim())
     .filter((statement) => statement.length > 0);
