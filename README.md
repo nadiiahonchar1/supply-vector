@@ -1407,3 +1407,984 @@ SupplyVector є системою керування товарним поток�
 ```
 
 Система поєднує запаси, потребу, резервування, транспорт і прийняття логістичних рішень в одному керованому процесі.
+
+## Database Structure
+
+SupplyVector використовує реляційну структуру бази даних, поділену на функціональні домени. База даних зберігає користувачів і права доступу, мережу магазинів, каталог товарів, запаси, переміщення товарів, транспорт, логістичні рішення та аудит операцій.
+
+### Database Domains
+
+```text
+AUTH
+├── users
+├── roles
+├── user_roles
+├── sessions
+├── password_resets
+├── password_history
+└── audit_logs
+
+NETWORK
+├── stores
+│   ├── is_storage_node
+│   ├── max_capacity
+│   ├── latitude
+│   └── longitude
+├── user_stores
+└── logistics_routes
+
+PRODUCTS
+└── products
+    ├── weight_kg
+    └── volume_m3
+
+INVENTORY
+├── inventory
+│   ├── quantity
+│   ├── min_stock
+│   ├── reserved_quantity
+│   └── max_stock
+├── inventory_movements
+└── inventory_reservations
+
+TRANSFERS
+├── transfer_requests
+├── shipments
+└── shipment_items
+
+TRANSPORT
+├── vehicles
+├── trips
+├── trip_stops
+└── trip_items
+
+DECISIONS
+└── logistics_decisions
+    ├── decision_source
+    └── decided_by
+
+VIEWS
+└── v_trip_utilization
+```
+
+---
+
+## AUTH
+
+### `users`
+
+Облікові записи користувачів системи.
+
+| Field           | Type      | Description                    |
+| --------------- | --------- | ------------------------------ |
+| `id`            | UUID      | Унікальний ідентифікатор       |
+| `email`         | TEXT      | Email користувача              |
+| `password_hash` | TEXT      | Хеш пароля                     |
+| `first_name`    | TEXT      | Ім'я                           |
+| `last_name`     | TEXT      | Прізвище                       |
+| `is_active`     | BOOLEAN   | Статус активності              |
+| `last_login_at` | TIMESTAMP | Час останнього входу           |
+| `created_by`    | UUID      | Користувач, який створив запис |
+| `deleted_by`    | UUID      | Користувач, який видалив запис |
+| `deleted_at`    | TIMESTAMP | Час видалення                  |
+| `created_at`    | TIMESTAMP | Час створення                  |
+| `updated_at`    | TIMESTAMP | Час оновлення                  |
+
+`email` є унікальним.
+
+---
+
+### `roles`
+
+Ролі користувачів системи.
+
+| Field  | Type | Description         |
+| ------ | ---- | ------------------- |
+| `id`   | UUID | Ідентифікатор ролі  |
+| `code` | TEXT | Унікальний код ролі |
+| `name` | TEXT | Назва ролі          |
+
+Поточний набір ролей включає:
+
+```text
+superadmin
+admin
+manager
+operator
+```
+
+---
+
+### `user_roles`
+
+Зв'язок користувачів із ролями.
+
+| Field     | Type | Description |
+| --------- | ---- | ----------- |
+| `user_id` | UUID | Користувач  |
+| `role_id` | UUID | Роль        |
+
+Первинний ключ складається з:
+
+```text
+(user_id, role_id)
+```
+
+---
+
+### `sessions`
+
+Сесії автентифікації користувачів.
+
+| Field          | Type      | Description            |
+| -------------- | --------- | ---------------------- |
+| `id`           | UUID      | Ідентифікатор сесії    |
+| `user_id`      | UUID      | Користувач             |
+| `token`        | TEXT      | Унікальний токен сесії |
+| `expires_at`   | TIMESTAMP | Час завершення сесії   |
+| `created_at`   | TIMESTAMP | Час створення          |
+| `last_used_at` | TIMESTAMP | Останнє використання   |
+
+---
+
+### `password_resets`
+
+Токени відновлення пароля.
+
+| Field        | Type      | Description        |
+| ------------ | --------- | ------------------ |
+| `id`         | UUID      | Ідентифікатор      |
+| `user_id`    | UUID      | Користувач         |
+| `token`      | TEXT      | Унікальний токен   |
+| `expires_at` | TIMESTAMP | Час завершення дії |
+| `used_at`    | TIMESTAMP | Час використання   |
+
+---
+
+### `password_history`
+
+Історія паролів користувача.
+
+| Field           | Type      | Description              |
+| --------------- | --------- | ------------------------ |
+| `id`            | UUID      | Ідентифікатор            |
+| `user_id`       | UUID      | Користувач               |
+| `password_hash` | TEXT      | Хеш використаного пароля |
+| `created_at`    | TIMESTAMP | Час створення            |
+
+---
+
+### `audit_logs`
+
+Журнал дій користувачів та системних операцій.
+
+| Field        | Type      | Description                    |
+| ------------ | --------- | ------------------------------ |
+| `id`         | UUID      | Ідентифікатор запису           |
+| `user_id`    | UUID      | Користувач, пов'язаний із дією |
+| `action`     | TEXT      | Виконана дія                   |
+| `entity`     | TEXT      | Тип сутності                   |
+| `entity_id`  | UUID      | Ідентифікатор сутності         |
+| `meta`       | JSONB     | Додаткові дані                 |
+| `ip_address` | TEXT      | IP-адреса                      |
+| `user_agent` | TEXT      | User-Agent                     |
+| `created_at` | TIMESTAMP | Час операції                   |
+
+Індекси створені для:
+
+```text
+user_id
+entity
+created_at
+```
+
+---
+
+# NETWORK
+
+## `stores`
+
+Магазини мережі та вузли розподіленого зберігання.
+
+| Field             | Type      | Description                                |
+| ----------------- | --------- | ------------------------------------------ |
+| `id`              | UUID      | Ідентифікатор магазину                     |
+| `name`            | TEXT      | Назва                                      |
+| `city`            | TEXT      | Місто                                      |
+| `address`         | TEXT      | Адреса                                     |
+| `is_storage_node` | BOOLEAN   | Участь магазину в розподіленому зберіганні |
+| `max_capacity`    | NUMERIC   | Максимальна місткість запасу               |
+| `latitude`        | NUMERIC   | Географічна широта                         |
+| `longitude`       | NUMERIC   | Географічна довгота                        |
+| `created_by`      | UUID      | Користувач, який створив запис             |
+| `updated_by`      | UUID      | Користувач, який оновив запис              |
+| `created_at`      | TIMESTAMP | Час створення                              |
+| `updated_at`      | TIMESTAMP | Час оновлення                              |
+
+Комбінація:
+
+```text
+(name, city, address)
+```
+
+є унікальною.
+
+`is_storage_node` визначає, чи бере магазин участь у розподіленому зберіганні та вихідних переміщеннях запасів.
+
+`max_capacity = NULL` означає відсутність заданого обмеження місткості.
+
+Координати обмежені:
+
+```text
+latitude:  -90 ... 90
+longitude: -180 ... 180
+```
+
+---
+
+## `user_stores`
+
+Зв'язок користувачів із магазинами, доступними їм у системі.
+
+| Field      | Type | Description |
+| ---------- | ---- | ----------- |
+| `user_id`  | UUID | Користувач  |
+| `store_id` | UUID | Магазин     |
+
+Первинний ключ:
+
+```text
+(user_id, store_id)
+```
+
+---
+
+## `logistics_routes`
+
+Відстані та характеристики маршрутів між магазинами.
+
+| Field                        | Type      | Description            |
+| ---------------------------- | --------- | ---------------------- |
+| `id`                         | UUID      | Ідентифікатор маршруту |
+| `store_a_id`                 | UUID      | Перший магазин         |
+| `store_b_id`                 | UUID      | Другий магазин         |
+| `distance_km`                | NUMERIC   | Відстань у кілометрах  |
+| `estimated_duration_minutes` | INTEGER   | Орієнтовна тривалість  |
+| `is_active`                  | BOOLEAN   | Статус маршруту        |
+| `created_at`                 | TIMESTAMP | Час створення          |
+| `updated_at`                 | TIMESTAMP | Час оновлення          |
+
+Для пари магазинів використовується один запис.
+
+Унікальність забезпечується:
+
+```text
+(store_a_id, store_b_id)
+```
+
+та правилом:
+
+```text
+store_a_id < store_b_id
+```
+
+Це дозволяє зберігати маршрут між двома магазинами один раз незалежно від напрямку переміщення.
+
+---
+
+# PRODUCTS
+
+## `products`
+
+Каталог товарів.
+
+| Field         | Type          | Description                    |
+| ------------- | ------------- | ------------------------------ |
+| `id`          | UUID          | Ідентифікатор товару           |
+| `name`        | TEXT          | Назва                          |
+| `sku`         | TEXT          | Унікальний SKU                 |
+| `price`       | NUMERIC(10,2) | Ціна                           |
+| `description` | TEXT          | Опис                           |
+| `is_active`   | BOOLEAN       | Статус активності              |
+| `weight_kg`   | NUMERIC(10,3) | Вага одиниці                   |
+| `volume_m3`   | NUMERIC(10,4) | Об'єм одиниці                  |
+| `created_by`  | UUID          | Користувач, який створив запис |
+| `updated_by`  | UUID          | Користувач, який оновив запис  |
+| `created_at`  | TIMESTAMP     | Час створення                  |
+| `updated_at`  | TIMESTAMP     | Час оновлення                  |
+
+`sku` є унікальним.
+
+`weight_kg` та `volume_m3` використовуються для розрахунку фактичного завантаження транспортних засобів.
+
+---
+
+# INVENTORY
+
+## `inventory`
+
+Поточний залишок конкретного товару в конкретному магазині.
+
+| Field               | Type      | Description                 |
+| ------------------- | --------- | --------------------------- |
+| `id`                | UUID      | Ідентифікатор               |
+| `store_id`          | UUID      | Магазин                     |
+| `product_id`        | UUID      | Товар                       |
+| `quantity`          | INTEGER   | Фактичний залишок           |
+| `reserved_quantity` | INTEGER   | Зарезервована кількість     |
+| `min_stock`         | INTEGER   | Мінімальний запас           |
+| `max_stock`         | INTEGER   | Максимальний цільовий запас |
+| `created_at`        | TIMESTAMP | Час створення               |
+| `updated_at`        | TIMESTAMP | Час оновлення               |
+
+Комбінація:
+
+```text
+(store_id, product_id)
+```
+
+є унікальною.
+
+Основні обмеження:
+
+```text
+quantity >= 0
+reserved_quantity >= 0
+reserved_quantity <= quantity
+min_stock >= 0
+max_stock IS NULL OR max_stock >= min_stock
+```
+
+Доступний для переміщення запас визначається з урахуванням активного резервування.
+
+---
+
+## `inventory_movements`
+
+Історія фактичних змін запасу.
+
+| Field              | Type      | Description                   |
+| ------------------ | --------- | ----------------------------- |
+| `id`               | UUID      | Ідентифікатор                 |
+| `store_id`         | UUID      | Магазин                       |
+| `product_id`       | UUID      | Товар                         |
+| `quantity_change`  | INTEGER   | Зміна кількості               |
+| `quantity_before`  | INTEGER   | Залишок до операції           |
+| `quantity_after`   | INTEGER   | Залишок після операції        |
+| `movement_type`    | TEXT      | Тип руху                      |
+| `shipment_id`      | UUID      | Пов'язане відправлення        |
+| `shipment_item_id` | UUID      | Пов'язаний товар відправлення |
+| `created_by`       | UUID      | Користувач                    |
+| `created_at`       | TIMESTAMP | Час операції                  |
+
+Підтримувані типи:
+
+```text
+purchase
+sale
+transfer_in
+transfer_out
+adjustment
+return
+```
+
+---
+
+## `inventory_reservations`
+
+Резервування запасу під переміщення.
+
+| Field                 | Type      | Description             |
+| --------------------- | --------- | ----------------------- |
+| `id`                  | UUID      | Ідентифікатор           |
+| `transfer_request_id` | UUID      | Запит на переміщення    |
+| `inventory_id`        | UUID      | Запис запасу            |
+| `quantity`            | INTEGER   | Зарезервована кількість |
+| `released_at`         | TIMESTAMP | Час звільнення резерву  |
+| `created_at`          | TIMESTAMP | Час створення           |
+
+Активним вважається резерв без:
+
+```text
+released_at
+```
+
+Для активних резервів створений partial index.
+
+---
+
+# TRANSFERS
+
+## `transfer_requests`
+
+Запити на переміщення товару між магазинами.
+
+| Field                  | Type      | Description                   |
+| ---------------------- | --------- | ----------------------------- |
+| `id`                   | UUID      | Ідентифікатор                 |
+| `source_store_id`      | UUID      | Магазин-джерело               |
+| `destination_store_id` | UUID      | Магазин-призначення           |
+| `product_id`           | UUID      | Товар                         |
+| `quantity`             | INTEGER   | Кількість                     |
+| `priority`             | TEXT      | Пріоритет                     |
+| `status`               | TEXT      | Статус                        |
+| `earliest_delivery`    | TIMESTAMP | Найраніша доставка            |
+| `latest_delivery`      | TIMESTAMP | Крайній термін доставки       |
+| `shipment_id`          | UUID      | Пов'язане відправлення        |
+| `created_by`           | UUID      | Автор                         |
+| `updated_by`           | UUID      | Користувач, який оновив запис |
+| `created_at`           | TIMESTAMP | Час створення                 |
+| `updated_at`           | TIMESTAMP | Час оновлення                 |
+| `cancelled_at`         | TIMESTAMP | Час скасування                |
+
+Пріоритети:
+
+```text
+critical
+high
+normal
+low
+```
+
+Статуси:
+
+```text
+pending
+approved
+fulfilled
+cancelled
+```
+
+Магазин-джерело та магазин-призначення не можуть бути однаковими.
+
+Часові обмеження гарантують, що:
+
+```text
+latest_delivery >= earliest_delivery
+```
+
+якщо обидва значення задані.
+
+---
+
+## `shipments`
+
+Фактичні відправлення товарів між магазинами.
+
+| Field                  | Type      | Description                   |
+| ---------------------- | --------- | ----------------------------- |
+| `id`                   | UUID      | Ідентифікатор                 |
+| `shipment_number`      | TEXT      | Унікальний номер відправлення |
+| `source_store_id`      | UUID      | Магазин-джерело               |
+| `destination_store_id` | UUID      | Магазин-призначення           |
+| `status`               | TEXT      | Статус                        |
+| `created_by`           | UUID      | Автор                         |
+| `updated_by`           | UUID      | Користувач, який оновив запис |
+| `created_at`           | TIMESTAMP | Час створення                 |
+| `updated_at`           | TIMESTAMP | Час оновлення                 |
+| `completed_at`         | TIMESTAMP | Час завершення                |
+
+Статуси:
+
+```text
+pending
+in_transit
+completed
+cancelled
+```
+
+Магазин-джерело та магазин-призначення не можуть бути однаковими.
+
+---
+
+## `shipment_items`
+
+Товари, включені до конкретного відправлення.
+
+| Field         | Type    | Description   |
+| ------------- | ------- | ------------- |
+| `id`          | UUID    | Ідентифікатор |
+| `shipment_id` | UUID    | Відправлення  |
+| `product_id`  | UUID    | Товар         |
+| `quantity`    | INTEGER | Кількість     |
+
+Кількість повинна бути більшою за нуль.
+
+---
+
+# TRANSPORT
+
+## `vehicles`
+
+Транспортні засоби.
+
+| Field             | Type      | Description                   |
+| ----------------- | --------- | ----------------------------- |
+| `id`              | UUID      | Ідентифікатор                 |
+| `name`            | TEXT      | Назва або номер               |
+| `type`            | TEXT      | Тип транспорту                |
+| `capacity_weight` | NUMERIC   | Максимальна вага вантажу      |
+| `capacity_volume` | NUMERIC   | Максимальний об'єм            |
+| `cost_per_km`     | NUMERIC   | Вартість кілометра            |
+| `fixed_cost`      | NUMERIC   | Фіксована вартість поїздки    |
+| `available_from`  | TIMESTAMP | Початок доступності           |
+| `available_to`    | TIMESTAMP | Кінець доступності            |
+| `is_active`       | BOOLEAN   | Статус активності             |
+| `created_by`      | UUID      | Автор                         |
+| `updated_by`      | UUID      | Користувач, який оновив запис |
+| `created_at`      | TIMESTAMP | Час створення                 |
+| `updated_at`      | TIMESTAMP | Час оновлення                 |
+
+Вантажопідйомність транспортного засобу повинна бути більшою за нуль.
+
+`capacity_volume` може бути `NULL`.
+
+---
+
+## `trips`
+
+Транспортні поїздки.
+
+| Field                 | Type      | Description                   |
+| --------------------- | --------- | ----------------------------- |
+| `id`                  | UUID      | Ідентифікатор                 |
+| `vehicle_id`          | UUID      | Транспортний засіб            |
+| `origin_store_id`     | UUID      | Початковий магазин            |
+| `status`              | TEXT      | Статус поїздки                |
+| `departure_at`        | TIMESTAMP | Час відправлення              |
+| `expected_arrival_at` | TIMESTAMP | Очікуваний час прибуття       |
+| `distance_km`         | NUMERIC   | Відстань                      |
+| `cost`                | NUMERIC   | Вартість                      |
+| `created_by`          | UUID      | Автор                         |
+| `updated_by`          | UUID      | Користувач, який оновив запис |
+| `created_at`          | TIMESTAMP | Час створення                 |
+| `updated_at`          | TIMESTAMP | Час оновлення                 |
+
+Статуси:
+
+```text
+planned
+ready
+in_transit
+delivered
+cancelled
+```
+
+Вартість та відстань не можуть бути від'ємними.
+
+---
+
+## `trip_stops`
+
+Зупинки транспортного засобу в межах поїздки.
+
+| Field                 | Type      | Description             |
+| --------------------- | --------- | ----------------------- |
+| `id`                  | UUID      | Ідентифікатор           |
+| `trip_id`             | UUID      | Поїздка                 |
+| `store_id`            | UUID      | Магазин                 |
+| `sequence`            | INTEGER   | Порядковий номер        |
+| `expected_arrival_at` | TIMESTAMP | Очікуваний час прибуття |
+| `actual_arrival_at`   | TIMESTAMP | Фактичний час прибуття  |
+
+Для кожної поїздки `sequence` є унікальним.
+
+---
+
+## `trip_items`
+
+Вантаж конкретної поїздки.
+
+| Field                 | Type      | Description           |
+| --------------------- | --------- | --------------------- |
+| `id`                  | UUID      | Ідентифікатор         |
+| `trip_id`             | UUID      | Поїздка               |
+| `transfer_request_id` | UUID      | Запит на переміщення  |
+| `pickup_stop_id`      | UUID      | Зупинка завантаження  |
+| `dropoff_stop_id`     | UUID      | Зупинка розвантаження |
+| `quantity`            | INTEGER   | Кількість             |
+| `created_at`          | TIMESTAMP | Час створення         |
+
+Одна поїздка може містити декілька `trip_items`.
+
+Це дозволяє консолідувати декілька запитів на переміщення в одну транспортну поїздку.
+
+---
+
+# DECISIONS
+
+## `logistics_decisions`
+
+Рішення щодо способу виконання запиту на переміщення.
+
+| Field                 | Type      | Description                      |
+| --------------------- | --------- | -------------------------------- |
+| `id`                  | UUID      | Ідентифікатор                    |
+| `transfer_request_id` | UUID      | Запит на переміщення             |
+| `trip_id`             | UUID      | Пов'язана поїздка                |
+| `decision_type`       | TEXT      | Тип рішення                      |
+| `total_cost`          | NUMERIC   | Загальна розрахована вартість    |
+| `cost_breakdown`      | JSONB     | Деталізація вартості             |
+| `reasoning`           | TEXT      | Обґрунтування                    |
+| `decision_source`     | TEXT      | Джерело рішення                  |
+| `decided_by`          | UUID      | Користувач, який прийняв рішення |
+| `created_at`          | TIMESTAMP | Час прийняття рішення            |
+
+Типи рішень:
+
+```text
+add_to_existing_trip
+create_new_trip
+defer
+```
+
+Джерела:
+
+```text
+system
+manual
+```
+
+Для системного рішення:
+
+```text
+decision_source = system
+decided_by = NULL
+```
+
+Для ручного рішення:
+
+```text
+decision_source = manual
+decided_by IS NOT NULL
+```
+
+Це правило контролюється безпосередньо базою даних.
+
+---
+
+# VIEWS
+
+## `v_trip_utilization`
+
+Представлення для контролю завантаження транспортних засобів.
+
+Представлення об'єднує:
+
+```text
+trips
+  ↓
+vehicles
+  ↓
+trip_items
+  ↓
+transfer_requests
+  ↓
+products
+```
+
+і розраховує:
+
+| Field                    | Description                              |
+| ------------------------ | ---------------------------------------- |
+| `trip_id`                | Поїздка                                  |
+| `status`                 | Статус                                   |
+| `vehicle_id`             | Транспорт                                |
+| `vehicle_name`           | Назва транспорту                         |
+| `capacity_weight`        | Вантажопідйомність                       |
+| `capacity_volume`        | Максимальний об'єм                       |
+| `loaded_weight_kg`       | Фактична вага вантажу                    |
+| `loaded_volume_m3`       | Фактичний об'єм вантажу                  |
+| `weight_utilization_pct` | Відсоток використання вантажопідйомності |
+| `volume_utilization_pct` | Відсоток використання об'єму             |
+
+Вага вантажу розраховується як:
+
+```text
+quantity × product.weight_kg
+```
+
+Об'єм вантажу розраховується як:
+
+```text
+quantity × product.volume_m3
+```
+
+Якщо транспортний засіб не має заданої `capacity_volume`, відсоток використання об'єму залишається `NULL`.
+
+---
+
+# Database Relationships
+
+Основні зв'язки між доменами:
+
+```text
+users
+ │
+ ├── user_roles ── roles
+ │
+ ├── user_stores ── stores
+ │
+ └── audit_logs
+
+
+stores
+ │
+ ├── inventory ── products
+ │       │
+ │       └── inventory_reservations
+ │                 │
+ │                 └── transfer_requests
+ │
+ ├── logistics_routes
+ │
+ └── shipments
+        │
+        └── shipment_items ── products
+
+
+transfer_requests
+ │
+ ├── inventory_reservations
+ │
+ ├── shipments
+ │
+ ├── trip_items
+ │
+ └── logistics_decisions
+
+
+trips
+ │
+ ├── vehicles
+ ├── trip_stops ── stores
+ └── trip_items
+        │
+        └── transfer_requests
+
+
+logistics_decisions
+ │
+ ├── transfer_requests
+ ├── trips
+ └── users
+
+
+inventory_movements
+ │
+ ├── stores
+ ├── products
+ ├── shipments
+ └── shipment_items
+```
+
+---
+
+# Data Integrity
+
+База даних контролює ключові правила цілісності даних через `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE` та `CHECK` constraints.
+
+Основні правила:
+
+- користувач має унікальний email;
+- роль має унікальний код;
+- SKU товару є унікальним;
+- комбінація назви, міста та адреси магазину є унікальною;
+- один товар має один запис запасу в конкретному магазині;
+- кількість запасу не може бути від'ємною;
+- зарезервований запас не може перевищувати фактичний;
+- максимальний запас не може бути меншим за мінімальний;
+- магазин-джерело та магазин-призначення не можуть збігатися;
+- кількість товару у переміщенні та вантажі повинна бути більшою за нуль;
+- координати магазинів перевіряються на допустимий географічний діапазон;
+- вантажопідйомність транспортного засобу повинна бути більшою за нуль;
+- часові інтервали перевіряються на коректну послідовність;
+- статуси основних сутностей обмежені визначеним набором значень;
+- маршрут між двома магазинами зберігається один раз;
+- ручне логістичне рішення завжди має користувача, який його прийняв;
+- системне логістичне рішення не має `decided_by`.
+
+---
+
+# Migrations
+
+Структура бази даних розвивається через послідовні SQL-міграції.
+
+```text
+db/
+└── migrations/
+    ├── 0001_init.sql
+    ├── 0002_distributed_inventory.sql
+    ├── 0003_transport.sql
+    ├── 0004_logistics_decisions.sql
+    ├── 0005_product_physical_attributes.sql
+    ├── 0006_trip_utilization_view.sql
+    ├── 0007_store_coordinates.sql
+    └── 0008_logistics_decision_source.sql
+```
+
+### Migration 0001 — Initial Schema
+
+Створює базові домени:
+
+```text
+users
+roles
+user_roles
+sessions
+password_resets
+password_history
+audit_logs
+
+stores
+user_stores
+
+products
+
+inventory
+
+shipments
+shipment_items
+
+inventory_movements
+```
+
+Також створює необхідні foreign keys, indexes, unique constraints та check constraints.
+
+Міграція оновлює роль `viewer` до `operator`.
+
+### Migration 0002 — Distributed Inventory
+
+Додає:
+
+```text
+stores.is_storage_node
+stores.max_capacity
+
+inventory.reserved_quantity
+inventory.max_stock
+
+transfer_requests
+inventory_reservations
+```
+
+Також додає індекси для роботи із запитами на переміщення та активними резервуваннями.
+
+### Migration 0003 — Transport
+
+Створює:
+
+```text
+vehicles
+trips
+trip_stops
+trip_items
+```
+
+для планування транспортних поїздок та консолідації вантажів.
+
+### Migration 0004 — Logistics Decisions
+
+Створює:
+
+```text
+logistics_routes
+logistics_decisions
+```
+
+для роботи з маршрутами та рішеннями щодо виконання переміщень.
+
+### Migration 0005 — Product Physical Attributes
+
+Додає до `products`:
+
+```text
+weight_kg
+volume_m3
+```
+
+для розрахунку ваги та об'єму вантажу.
+
+### Migration 0006 — Trip Utilization View
+
+Створює:
+
+```text
+v_trip_utilization
+```
+
+для розрахунку фактичного завантаження транспортних засобів.
+
+### Migration 0007 — Store Coordinates
+
+Додає до `stores`:
+
+```text
+latitude
+longitude
+```
+
+для географічного визначення положення магазинів та розрахунку логістичних відстаней.
+
+### Migration 0008 — Logistics Decision Source
+
+Додає до `logistics_decisions`:
+
+```text
+decision_source
+decided_by
+```
+
+та забезпечує на рівні БД відповідність між джерелом рішення та користувачем, який його прийняв.
+
+---
+
+# Current Database Model
+
+У результаті виконання міграцій `0001`–`0008` база даних містить:
+
+```text
+21 TABLES
+
+AUTH
+├── users
+├── roles
+├── user_roles
+├── sessions
+├── password_resets
+├── password_history
+└── audit_logs
+
+NETWORK
+├── stores
+├── user_stores
+└── logistics_routes
+
+PRODUCTS
+└── products
+
+INVENTORY
+├── inventory
+├── inventory_movements
+└── inventory_reservations
+
+TRANSFERS
+├── transfer_requests
+├── shipments
+└── shipment_items
+
+TRANSPORT
+├── vehicles
+├── trips
+├── trip_stops
+└── trip_items
+
+DECISIONS
+└── logistics_decisions
+
+
+1 VIEW
+
+VIEWS
+└── v_trip_utilization
+```
