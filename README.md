@@ -2387,4 +2387,68 @@ DECISIONS
 
 VIEWS
 └── v_trip_utilization
+
+
+
+PHASE 1 — MASTER DATA
+
+1. Stores Service
+   ├── queries
+   ├── service
+   ├── permissions
+   └── API
+
+2. Products Service
+   ├── queries
+   ├── service
+   ├── permissions
+   └── API
+
+3. Vehicles Service
+   ├── queries
+   ├── service
+   ├── permissions
+   └── API
+
+
+PHASE 2 — INVENTORY
+
+4. Inventory Service
+5. Atomic reservation
+6. Inventory movements
+
+
+PHASE 3 — TRANSFERS
+
+7. Transfer Requests
+8. Validation
+9. Reservation
+10. Approval / cancellation
+
+
+PHASE 4 — LOGISTICS
+
+11. Logistics routes
+12. Distance calculation
+13. Existing trip matching
+14. Max-wait timer
+15. Create new trip
+
+
+PHASE 5 — DECISIONS
+
+16. System decision
+17. Manual decision
+18. decision_source
+19. decided_by
+20. reasoning / cost breakdown
+
+
+PHASE 6 — EXECUTION
+
+21. Shipments
+22. Trip stops
+23. Cargo
+24. Delivery
+25. Inventory movements
 ```
