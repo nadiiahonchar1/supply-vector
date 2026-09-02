@@ -9,7 +9,11 @@ export type AuditAction =
   | "user:update"
   | "user:change-role"
   | "user:activate"
-  | "user:deactivate";
+  | "user:deactivate"
+
+//STORES
+  | "store:create"
+  | "store:update";
 
 export type AuditMeta =
   | {
