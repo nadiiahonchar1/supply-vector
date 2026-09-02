@@ -1,7 +1,7 @@
 import { sql } from "@/db";
 
 import { getCurrentUser } from "@/lib/auth/server";
-import { PERMISSIONS, checkPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type {
@@ -26,11 +26,11 @@ export class StoresService {
   }
 
   private static requirePermission(
-    role: Parameters<typeof checkPermission>[0],
-    permission: Parameters<typeof checkPermission>[1],
+    role: Parameters<typeof hasPermission>[0],
+    permission: Parameters<typeof hasPermission>[1],
     errorMessage?: string,
   ) {
-    if (!checkPermission(role, permission)) {
+    if (!hasPermission(role, permission)) {
       throw new ForbiddenError(errorMessage);
     }
   }
