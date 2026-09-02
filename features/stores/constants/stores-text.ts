@@ -1,17 +1,15 @@
 export const STORES_TEXT = {
-  dialog: {
-    title: "Увійти",
-    description: "Введіть свої облікові дані, щоб продовжити.",
-    email: "Email",
-    password: "Пароль",
-    submitting: "Вхід...",
-    submit: "Увійти",
+  error: {
+    empty_store: "Магазин не знайдено",
+    duplicate: "Магазин з такими даними вже існує",
+    forbidden_create: "Недостатньо прав для створення магазину",
+    forbidden_update: "Недостатньо прав для редагування магазину",
+    invalid_coordinates: "Некоректні координати",
+    invalid_capacity: "Некоректна максимальна місткість",
   },
 
-  error: {
-    unauthorized: "Неавторизований користувач",
-    credentials: "Недійсні облікові дані",
-    forbidden: "Заборонено",
-    invalid: "Неправильна електронна адреса або пароль",
+  success: {
+    created: "Магазин успішно створено",
+    updated: "Магазин успішно оновлено",
   },
 } as const;
