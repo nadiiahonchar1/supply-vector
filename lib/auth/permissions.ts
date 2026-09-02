@@ -26,6 +26,11 @@ export const PERMISSIONS = {
   // USERS
   USER_VIEW: "user:view",
 
+  //STORE
+  STORE_VIEW: "store:view",
+  STORE_CREATE: "store:create",
+  STORE_UPDATE: "store:update",
+
   // INVENTORY
   INVENTORY_VIEW: "inventory:view",
   INVENTORY_ADJUST: "inventory:adjust",
@@ -49,6 +54,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
   superadmin: [
     PERMISSIONS.USER_VIEW,
 
+    PERMISSIONS.STORE_VIEW,
+    PERMISSIONS.STORE_CREATE,
+    PERMISSIONS.STORE_UPDATE,
+
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
@@ -63,6 +72,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
 
   admin: [
     PERMISSIONS.USER_VIEW,
+
+    PERMISSIONS.STORE_VIEW,
+    PERMISSIONS.STORE_CREATE,
+    PERMISSIONS.STORE_UPDATE,
 
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
@@ -79,6 +92,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
   manager: [
     PERMISSIONS.USER_VIEW,
 
+    PERMISSIONS.STORE_VIEW,
+    PERMISSIONS.STORE_CREATE,
+    PERMISSIONS.STORE_UPDATE,
+
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
@@ -89,6 +106,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
 
   operator: [
     PERMISSIONS.USER_VIEW,
+
+    PERMISSIONS.STORE_VIEW,
 
     PERMISSIONS.INVENTORY_VIEW,
 
