@@ -11,9 +11,13 @@ export type AuditAction =
   | "user:activate"
   | "user:deactivate"
 
-//STORES
+  //STORES
   | "store:create"
-  | "store:update";
+  | "store:update"
+
+  //PRODUCTS
+  | "product:create"
+  | "product:update";
 
 export type AuditMeta =
   | {
