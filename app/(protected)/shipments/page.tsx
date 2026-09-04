@@ -1,10 +1,10 @@
 // import { Suspense } from "react";
-import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
-import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
-import { ShipmentsPage } from "@/features/shipments/components/shipments-page";
+// import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
+// import { getStoresQuery } from "@/features/stores/queries/get-stores-query";
+// import { ShipmentsPage } from "@/features/shipments/components/shipments-page";
 // import { ShipmentsSkeleton } from "@/features/shipments/components/shipments-skeleton";
-import { getShipmentsStatsQuery } from "@/features/shipments/queries/get-shipments-stats-query";
-import { ShipmentStatus, ShipmentFilters } from "@/features/shipments/types";
+// import { getShipmentsStatsQuery } from "@/features/shipments/queries/get-shipments-stats-query";
+// import { ShipmentStatus, ShipmentFilters } from "@/features/shipments/types";
 
 type SearchParams = {
   status?: string;
@@ -12,50 +12,53 @@ type SearchParams = {
   destinationStoreId?: string;
 };
 
-const allowedStatuses: ShipmentStatus[] = [
-  "pending",
-  "in_transit",
-  "completed",
-  "cancelled",
-];
+// const allowedStatuses: ShipmentStatus[] = [
+//   "pending",
+//   "in_transit",
+//   "completed",
+//   "cancelled",
+// ];
 
-function isShipmentStatus(value: string): value is ShipmentStatus {
-  return allowedStatuses.includes(value as ShipmentStatus);
-}
+// function isShipmentStatus(value: string): value is ShipmentStatus {
+//   return allowedStatuses.includes(value as ShipmentStatus);
+// }
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const params = await searchParams;
+export default async function Page(
+  {
+    // searchParams,
+  }: {
+    searchParams: Promise<SearchParams>;
+  },
+) {
+  // const params = await searchParams;
 
-  const status = params.status
-    ? isShipmentStatus(params.status)
-      ? params.status
-      : undefined
-    : undefined;
+  // const status = params.status
+  //   ? isShipmentStatus(params.status)
+  //     ? params.status
+  //     : undefined
+  //   : undefined;
 
-  const filters: ShipmentFilters = {
-    status,
-    sourceStoreId: params.sourceStoreId,
-    destinationStoreId: params.destinationStoreId,
-  };
+  // const filters: ShipmentFilters = {
+  //   status,
+  //   sourceStoreId: params.sourceStoreId,
+  //   destinationStoreId: params.destinationStoreId,
+  // };
 
-  const [shipments, stores, stats] = await Promise.all([
-    getShipmentsQuery(filters),
-    getStoresQuery(),
-    getShipmentsStatsQuery(),
-  ]);
+  // const [shipments, stores, stats] = await Promise.all([
+  //   getShipmentsQuery(filters),
+  //   getStoresQuery(),
+  //   getShipmentsStatsQuery(),
+  // ]);
 
   return (
+    <h1>Shipment</h1>
     // <Suspense fallback={<ShipmentsSkeleton />}>
-    <ShipmentsPage
-      shipments={shipments}
-      filters={filters}
-      stores={stores}
-      stats={stats}
-    />
+    // <ShipmentsPage
+    //   shipments={shipments}
+    //   filters={filters}
+    //   stores={stores}
+    //   stats={stats}
+    // />
     // </Suspense>
   );
 }
