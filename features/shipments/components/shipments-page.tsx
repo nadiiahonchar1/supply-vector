@@ -3,7 +3,7 @@ import type {
   ShipmentFilters,
   ShipmentsStats as ShipmentsStatsType,
 } from "../types";
-import type { StoreOption } from "@/features/stores/types";
+import type { StoreOption } from "../components/shipment-form";
 import { ShipmentsTable } from "./shipments-table";
 import { ShipmentsFilters } from "./shipments-filters";
 import { ShipmentsStats } from "./shipments-stats";

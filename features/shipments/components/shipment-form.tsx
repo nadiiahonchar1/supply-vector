@@ -12,7 +12,7 @@ type InventoryItem = {
   quantity: number;
   min_stock: number;
 };
-type StoreOption = {
+export type StoreOption = {
   id: string;
   name: string;
   city: string;

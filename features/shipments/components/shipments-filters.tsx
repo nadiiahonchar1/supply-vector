@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import type { StoreOption } from "@/features/stores/types";
+import type { StoreOption } from "../components/shipment-form";
 import { ShipmentFilters } from "../types";
 
 type Props = {
