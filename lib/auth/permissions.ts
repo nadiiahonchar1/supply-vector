@@ -36,6 +36,7 @@ export const PERMISSIONS = {
   INVENTORY_ADJUST: "inventory:adjust",
 
   // PRODUCTS
+  PRODUCT_VIEW: "product:view",
   PRODUCT_CREATE: "product:create",
   PRODUCT_UPDATE: "product:update",
 
@@ -61,6 +62,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
+    PERMISSIONS.PRODUCT_VIEW,
     PERMISSIONS.PRODUCT_CREATE,
     PERMISSIONS.PRODUCT_UPDATE,
 
@@ -80,6 +82,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
+    PERMISSIONS.PRODUCT_VIEW,
     PERMISSIONS.PRODUCT_CREATE,
     PERMISSIONS.PRODUCT_UPDATE,
 
@@ -99,6 +102,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_ADJUST,
 
+    PERMISSIONS.PRODUCT_VIEW,
+
     PERMISSIONS.SHIPMENT_CREATE,
     PERMISSIONS.SHIPMENT_UPDATE,
     PERMISSIONS.SHIPMENT_VIEW,
@@ -110,6 +115,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.STORE_VIEW,
 
     PERMISSIONS.INVENTORY_VIEW,
+
+    PERMISSIONS.PRODUCT_VIEW,
 
     PERMISSIONS.SHIPMENT_VIEW,
   ],
