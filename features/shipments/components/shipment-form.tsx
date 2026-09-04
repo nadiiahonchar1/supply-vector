@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { StoreOption } from "@/features/stores/types";
+// import type { StoreOption } from "@/features/stores/types";
 import { createShipmentAction } from "../actions/create-shipment";
 
 type InventoryItem = {
@@ -11,6 +11,24 @@ type InventoryItem = {
   product_id: string;
   quantity: number;
   min_stock: number;
+};
+type StoreOption = {
+  id: string;
+  name: string;
+  city: string;
+  address: string;
+
+  latitude: number | null;
+  longitude: number | null;
+
+  is_storage_node: boolean;
+  max_capacity: number | null;
+
+  created_by: string | null;
+  updated_by: string | null;
+
+  created_at: string;
+  updated_at: string;
 };
 
 type Props = {
