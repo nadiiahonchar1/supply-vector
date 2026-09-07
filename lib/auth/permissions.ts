@@ -45,6 +45,11 @@ export const PERMISSIONS = {
   SHIPMENT_UPDATE: "shipment:update",
   SHIPMENT_CANCEL: "shipment:cancel",
   SHIPMENT_VIEW: "shipment:view",
+
+  //VEHICLE
+  VEHICLE_VIEW: "vehicle:view",
+  VEHICLE_CREATE: "vehicle:create",
+  VEHICLE_UPDATE: "vehicle:update",
 } as const;
 
 // =====================================
@@ -70,6 +75,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.SHIPMENT_UPDATE,
     PERMISSIONS.SHIPMENT_CANCEL,
     PERMISSIONS.SHIPMENT_VIEW,
+
+    PERMISSIONS.VEHICLE_VIEW,
+    PERMISSIONS.VEHICLE_CREATE,
+    PERMISSIONS.VEHICLE_UPDATE,
   ],
 
   admin: [
@@ -90,6 +99,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.SHIPMENT_UPDATE,
     PERMISSIONS.SHIPMENT_CANCEL,
     PERMISSIONS.SHIPMENT_VIEW,
+
+    PERMISSIONS.VEHICLE_VIEW,
+    PERMISSIONS.VEHICLE_CREATE,
+    PERMISSIONS.VEHICLE_UPDATE,
   ],
 
   manager: [
@@ -107,6 +120,10 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.SHIPMENT_CREATE,
     PERMISSIONS.SHIPMENT_UPDATE,
     PERMISSIONS.SHIPMENT_VIEW,
+
+    PERMISSIONS.VEHICLE_VIEW,
+    PERMISSIONS.VEHICLE_CREATE,
+    PERMISSIONS.VEHICLE_UPDATE,
   ],
 
   operator: [
@@ -119,6 +136,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     PERMISSIONS.PRODUCT_VIEW,
 
     PERMISSIONS.SHIPMENT_VIEW,
+
+    PERMISSIONS.VEHICLE_VIEW,
   ],
 };
 
