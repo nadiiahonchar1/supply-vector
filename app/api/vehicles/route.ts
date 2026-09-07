@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { VehiclesService } from "@/lib/vehicles/vehicles.service";
+import { VehiclesService } from "@/lib/vehicles";
 import { handleApiError } from "@/lib/errors/handle-api-error";
 
-import { createVehicleSchema } from "@/features/vehicles/validation";
+import { createVehicleSchema } from "@/features/vehicles/validation/vehicle.schema";
 
 export async function GET() {
   try {
