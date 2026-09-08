@@ -2,7 +2,7 @@ import { sql } from "@/db";
 
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
-import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type { CurrentUser } from "@/features/auth/types";
 
@@ -116,7 +116,7 @@ export class ProductsService {
     `;
 
     if (existing.length) {
-      throw new Error(PRODUCT_TEXT.error.duplicate_sku);
+      throw new ValidationError(PRODUCT_TEXT.error.duplicate_sku);
     }
 
     const productId = crypto.randomUUID();
@@ -188,7 +188,7 @@ export class ProductsService {
     `;
 
     if (duplicate.length) {
-      throw new Error(PRODUCT_TEXT.error.duplicate_sku);
+      throw new ValidationError(PRODUCT_TEXT.error.duplicate_sku);
     }
 
     const price = data.price !== undefined ? data.price : existing.price;

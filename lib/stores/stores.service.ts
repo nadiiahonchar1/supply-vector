@@ -2,7 +2,7 @@ import { sql } from "@/db";
 
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
-import { ForbiddenError, NotFoundError } from "@/lib/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type { CurrentUser } from "@/features/auth/types";
 
@@ -118,7 +118,7 @@ export class StoresService {
     `;
 
     if (existing.length) {
-      throw new Error(STORES_TEXT.error.duplicate);
+      throw new ValidationError(STORES_TEXT.error.duplicate);
     }
 
     const storeId = crypto.randomUUID();
@@ -198,7 +198,7 @@ export class StoresService {
     `;
 
     if (duplicate.length) {
-      throw new Error(STORES_TEXT.error.duplicate);
+      throw new ValidationError(STORES_TEXT.error.duplicate);
     }
 
     const latitude =
