@@ -17,7 +17,11 @@ export type AuditAction =
 
   //PRODUCTS
   | "product:create"
-  | "product:update";
+  | "product:update"
+
+  //VEVICLE
+  | "vehicle:create"
+  | "vehicle:update";
 
 export type AuditMeta =
   | {
