@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 
-import { StoresService } from "@/lib/stores/stores.service";
+import { requireUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
-import { getCurrentUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors/handle-api-error";
+import { validate } from "@/lib/validation/validate";
 
+import { StoresService } from "@/lib/stores/stores.service";
 import { updateStoreSchema } from "@/features/stores/validation/store.schema";
 
 type Params = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(_request: Request, { params }: Params) {
   try {
+    const currentUser = await requireUser();
     const { id } = await params;
 
-    const store = await StoresService.getStore(id);
+    const store = await StoresService.getStore(id, currentUser);
 
     return NextResponse.json(store);
   } catch (error) {
@@ -27,29 +27,24 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    const currentUser = await requireUser();
     const { id } = await params;
-
     const body = await request.json();
-    const input = updateStoreSchema.parse(body);
 
-    const store = await StoresService.updateStore(id, input);
+    const input = validate(updateStoreSchema, body);
 
-    const currentUser = await getCurrentUser();
+    const store = await StoresService.updateStore(id, input, currentUser);
 
-    if (currentUser) {
-      await AuditService.log({
-        userId: currentUser.id,
-        action: "store:update",
-        entity: "stores",
-        entityId: store.id,
-        meta: {
-          name: store.name,
-          city: store.city,
-          address: store.address,
-          is_storage_node: store.is_storage_node,
-        },
-      });
-    }
+    await AuditService.log({
+      userId: currentUser.id,
+      action: "store:update",
+      entity: "store",
+      entityId: store.id,
+      meta: {
+        name: store.name,
+        city: store.city,
+      },
+    });
 
     return NextResponse.json(store);
   } catch (error) {

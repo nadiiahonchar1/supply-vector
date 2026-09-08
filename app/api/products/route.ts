@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 
-import { ProductsService } from "@/lib/products/products.service";
+import { requireUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
-import { getCurrentUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors/handle-api-error";
+import { validate } from "@/lib/validation/validate";
 
+import { ProductsService } from "@/lib/products/products.service";
 import { createProductSchema } from "@/features/products/validation/product.schema";
 
 export async function GET() {
   try {
-    const products = await ProductsService.getProducts();
+    const currentUser = await requireUser();
+
+    const products = await ProductsService.getProducts(currentUser);
 
     return NextResponse.json(products);
   } catch (error) {
@@ -19,25 +22,23 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await requireUser();
     const body = await request.json();
-    const input = createProductSchema.parse(body);
 
-    const product = await ProductsService.createProduct(input);
+    const input = validate(createProductSchema, body);
 
-    const currentUser = await getCurrentUser();
+    const product = await ProductsService.createProduct(input, currentUser);
 
-    if (currentUser) {
-      await AuditService.log({
-        userId: currentUser.id,
-        action: "product:create",
-        entity: "products",
-        entityId: product.id,
-        meta: {
-          name: product.name,
-          sku: product.sku,
-        },
-      });
-    }
+    await AuditService.log({
+      userId: currentUser.id,
+      action: "product:create",
+      entity: "product",
+      entityId: product.id,
+      meta: {
+        name: product.name,
+        sku: product.sku,
+      },
+    });
 
     return NextResponse.json(product, {
       status: 201,

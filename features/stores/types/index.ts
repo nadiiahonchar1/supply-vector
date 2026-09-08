@@ -3,13 +3,14 @@ export type Store = {
   name: string;
   city: string;
   address: string;
-  is_active: boolean;
 
   latitude: number | null;
   longitude: number | null;
 
   is_storage_node: boolean;
   max_capacity: number | null;
+
+  is_active: boolean;
 
   created_by: string | null;
   updated_by: string | null;
@@ -22,7 +23,6 @@ export type CreateStoreInput = {
   name: string;
   city: string;
   address: string;
-  is_active: boolean;
 
   latitude?: number | null;
   longitude?: number | null;
@@ -31,4 +31,6 @@ export type CreateStoreInput = {
   max_capacity?: number | null;
 };
 
-export type UpdateStoreInput = Partial<CreateStoreInput>;
+export type UpdateStoreInput = Partial<CreateStoreInput> & {
+  is_active?: boolean;
+};

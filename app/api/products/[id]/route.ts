@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 
-import { ProductsService } from "@/lib/products/products.service";
+import { requireUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
-import { getCurrentUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors/handle-api-error";
+import { validate } from "@/lib/validation/validate";
 
+import { ProductsService } from "@/lib/products/products.service";
 import { updateProductSchema } from "@/features/products/validation/product.schema";
 
 type Params = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(_request: Request, { params }: Params) {
   try {
+    const currentUser = await requireUser();
     const { id } = await params;
 
-    const product = await ProductsService.getProduct(id);
+    const product = await ProductsService.getProduct(id, currentUser);
 
     return NextResponse.json(product);
   } catch (error) {
@@ -27,28 +27,24 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    const currentUser = await requireUser();
     const { id } = await params;
-
     const body = await request.json();
-    const input = updateProductSchema.parse(body);
 
-    const product = await ProductsService.updateProduct(id, input);
+    const input = validate(updateProductSchema, body);
 
-    const currentUser = await getCurrentUser();
+    const product = await ProductsService.updateProduct(id, input, currentUser);
 
-    if (currentUser) {
-      await AuditService.log({
-        userId: currentUser.id,
-        action: "product:update",
-        entity: "products",
-        entityId: product.id,
-        meta: {
-          name: product.name,
-          sku: product.sku,
-          is_active: product.is_active,
-        },
-      });
-    }
+    await AuditService.log({
+      userId: currentUser.id,
+      action: "product:update",
+      entity: "product",
+      entityId: product.id,
+      meta: {
+        name: product.name,
+        sku: product.sku,
+      },
+    });
 
     return NextResponse.json(product);
   } catch (error) {

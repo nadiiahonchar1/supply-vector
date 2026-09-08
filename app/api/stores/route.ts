@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 
-import { StoresService } from "@/lib/stores/stores.service";
+import { requireUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
-import { getCurrentUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors/handle-api-error";
+import { validate } from "@/lib/validation/validate";
 
+import { StoresService } from "@/lib/stores/stores.service";
 import { createStoreSchema } from "@/features/stores/validation/store.schema";
 
 export async function GET() {
   try {
-    const stores = await StoresService.getStores();
+    const currentUser = await requireUser();
+
+    const stores = await StoresService.getStores(currentUser);
 
     return NextResponse.json(stores);
   } catch (error) {
@@ -17,32 +20,29 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const currentUser = await requireUser();
+    const body = await request.json();
 
-    const input = createStoreSchema.parse(body);
+    const input = validate(createStoreSchema, body);
 
-    const store = await StoresService.createStore(input);
+    const store = await StoresService.createStore(input, currentUser);
 
-    const currentUser = await getCurrentUser();
+    await AuditService.log({
+      userId: currentUser.id,
+      action: "store:create",
+      entity: "store",
+      entityId: store.id,
+      meta: {
+        name: store.name,
+        city: store.city,
+      },
+    });
 
-    if (currentUser) {
-      await AuditService.log({
-        userId: currentUser.id,
-        action: "store:create",
-        entity: "stores",
-        entityId: store.id,
-        meta: {
-          name: store.name,
-          city: store.city,
-          address: store.address,
-          is_storage_node: store.is_storage_node,
-        },
-      });
-    }
-
-    return NextResponse.json(store, { status: 201 });
+    return NextResponse.json(store, {
+      status: 201,
+    });
   } catch (error) {
     return handleApiError(error);
   }
