@@ -1,9 +1,10 @@
 import { sql } from "@/db";
 
-import { getCurrentUser } from "@/lib/auth/server";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
-import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ForbiddenError, NotFoundError } from "@/lib/errors";
+
+import type { CurrentUser } from "@/features/auth/types";
 
 import type {
   Product,
@@ -13,27 +14,37 @@ import type {
 
 import { PRODUCT_TEXT } from "@/features/products/constants/product-text";
 
-type ProductRow = Product;
+type ProductRow = {
+  id: string;
+  name: string;
+  sku: string;
+  price: string | number;
+  description: string | null;
+  weight_kg: string | number | null;
+  volume_m3: string | number | null;
+  is_active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function normalizeProduct(row: ProductRow): Product {
+  return {
+    ...row,
+    price: Number(row.price),
+    weight_kg: row.weight_kg !== null ? Number(row.weight_kg) : null,
+    volume_m3: row.volume_m3 !== null ? Number(row.volume_m3) : null,
+  };
+}
 
 export class ProductsService {
-  private static async requireCurrentUser() {
-    const currentUser = await getCurrentUser();
-
-    if (!currentUser) {
-      throw new ForbiddenError();
-    }
-
-    return currentUser;
-  }
-
-  static async getProducts(): Promise<Product[]> {
-    const currentUser = await this.requireCurrentUser();
-
+  static async getProducts(currentUser: CurrentUser): Promise<Product[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_VIEW)) {
       throw new ForbiddenError();
     }
 
-    return (await sql`
+    const rows = (await sql`
       SELECT
         id,
         name,
@@ -48,18 +59,22 @@ export class ProductsService {
         created_at,
         updated_at
       FROM products
+      WHERE is_active = TRUE
       ORDER BY name
     `) as ProductRow[];
+
+    return rows.map(normalizeProduct);
   }
 
-  static async getProduct(id: string): Promise<Product> {
-    const currentUser = await this.requireCurrentUser();
-
+  static async getProduct(
+    id: string,
+    currentUser: CurrentUser,
+  ): Promise<Product> {
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_VIEW)) {
       throw new ForbiddenError();
     }
 
-    const products = (await sql`
+    const rows = (await sql`
       SELECT
         id,
         name,
@@ -78,34 +93,35 @@ export class ProductsService {
       LIMIT 1
     `) as ProductRow[];
 
-    if (!products.length) {
+    if (!rows.length) {
       throw new NotFoundError(PRODUCT_TEXT.error.empty_product);
     }
 
-    return products[0];
+    return normalizeProduct(rows[0]);
   }
 
-  static async createProduct(data: CreateProductInput): Promise<Product> {
-    const currentUser = await this.requireCurrentUser();
-
+  static async createProduct(
+    data: CreateProductInput,
+    currentUser: CurrentUser,
+  ): Promise<Product> {
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_CREATE)) {
       throw new ForbiddenError(PRODUCT_TEXT.error.forbidden_create);
     }
 
-    const existing = (await sql`
+    const existing = await sql`
       SELECT id
       FROM products
       WHERE sku = ${data.sku}
       LIMIT 1
-    `) as { id: string }[];
+    `;
 
     if (existing.length) {
-      throw new ValidationError(PRODUCT_TEXT.error.duplicate_sku);
+      throw new Error(PRODUCT_TEXT.error.duplicate_sku);
     }
 
     const productId = crypto.randomUUID();
 
-    const products = (await sql`
+    const rows = (await sql`
       INSERT INTO products (
         id,
         name,
@@ -145,53 +161,51 @@ export class ProductsService {
         updated_at
     `) as ProductRow[];
 
-    return products[0];
+    return normalizeProduct(rows[0]);
   }
 
   static async updateProduct(
     id: string,
     data: UpdateProductInput,
+    currentUser: CurrentUser,
   ): Promise<Product> {
-    const currentUser = await this.requireCurrentUser();
-
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_UPDATE)) {
       throw new ForbiddenError(PRODUCT_TEXT.error.forbidden_update);
     }
 
-    const existingProduct = await this.getProduct(id);
+    const existing = await this.getProduct(id, currentUser);
 
-    const name = data.name ?? existingProduct.name;
-    const sku = data.sku ?? existingProduct.sku;
-    const price = data.price ?? existingProduct.price;
+    const name = data.name !== undefined ? data.name : existing.name;
 
-    const description =
-      data.description !== undefined
-        ? data.description
-        : existingProduct.description;
+    const sku = data.sku !== undefined ? data.sku : existing.sku;
 
-    const weightKg =
-      data.weight_kg !== undefined ? data.weight_kg : existingProduct.weight_kg;
-
-    const volumeM3 =
-      data.volume_m3 !== undefined ? data.volume_m3 : existingProduct.volume_m3;
-
-    const isActive =
-      data.is_active !== undefined ? data.is_active : existingProduct.is_active;
-
-    const duplicate = (await sql`
+    const duplicate = await sql`
       SELECT id
       FROM products
-      WHERE
-        sku = ${sku}
+      WHERE sku = ${sku}
         AND id <> ${id}
       LIMIT 1
-    `) as { id: string }[];
+    `;
 
     if (duplicate.length) {
-      throw new ValidationError(PRODUCT_TEXT.error.duplicate_sku);
+      throw new Error(PRODUCT_TEXT.error.duplicate_sku);
     }
 
-    const products = (await sql`
+    const price = data.price !== undefined ? data.price : existing.price;
+
+    const description =
+      data.description !== undefined ? data.description : existing.description;
+
+    const weightKg =
+      data.weight_kg !== undefined ? data.weight_kg : existing.weight_kg;
+
+    const volumeM3 =
+      data.volume_m3 !== undefined ? data.volume_m3 : existing.volume_m3;
+
+    const isActive =
+      data.is_active !== undefined ? data.is_active : existing.is_active;
+
+    const rows = (await sql`
       UPDATE products
       SET
         name = ${name},
@@ -219,10 +233,10 @@ export class ProductsService {
         updated_at
     `) as ProductRow[];
 
-    if (!products.length) {
+    if (!rows.length) {
       throw new NotFoundError(PRODUCT_TEXT.error.empty_product);
     }
 
-    return products[0];
+    return normalizeProduct(rows[0]);
   }
 }
