@@ -3,6 +3,7 @@ export type Store = {
   name: string;
   city: string;
   address: string;
+  is_active: boolean;
 
   latitude: number | null;
   longitude: number | null;
@@ -21,6 +22,7 @@ export type CreateStoreInput = {
   name: string;
   city: string;
   address: string;
+  is_active: boolean;
 
   latitude?: number | null;
   longitude?: number | null;
