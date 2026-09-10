@@ -18,25 +18,16 @@ type ProductRow = {
   id: string;
   name: string;
   sku: string;
-  price: string | number;
+  price: number;
   description: string | null;
-  weight_kg: string | number | null;
-  volume_m3: string | number | null;
+  weight_kg: number | null;
+  volume_m3: number | null;
   is_active: boolean;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
-
-function normalizeProduct(row: ProductRow): Product {
-  return {
-    ...row,
-    price: Number(row.price),
-    weight_kg: row.weight_kg !== null ? Number(row.weight_kg) : null,
-    volume_m3: row.volume_m3 !== null ? Number(row.volume_m3) : null,
-  };
-}
 
 export class ProductsService {
   static async getProducts(currentUser: CurrentUser): Promise<Product[]> {
@@ -63,7 +54,7 @@ export class ProductsService {
       ORDER BY name
     `) as ProductRow[];
 
-    return rows.map(normalizeProduct);
+    return rows;
   }
 
   static async getProductById(
@@ -97,7 +88,7 @@ export class ProductsService {
       throw new NotFoundError(PRODUCT_TEXT.error.empty_product);
     }
 
-    return normalizeProduct(rows[0]);
+    return rows[0];
   }
 
   static async createProduct(
@@ -161,7 +152,7 @@ export class ProductsService {
         updated_at
     `) as ProductRow[];
 
-    return normalizeProduct(rows[0]);
+    return rows[0];
   }
 
   static async updateProduct(
@@ -237,6 +228,6 @@ export class ProductsService {
       throw new NotFoundError(PRODUCT_TEXT.error.empty_product);
     }
 
-    return normalizeProduct(rows[0]);
+    return rows[0];
   }
 }
