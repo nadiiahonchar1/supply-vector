@@ -68,7 +68,7 @@ export class StoresService {
     return rows.map(normalizeStore);
   }
 
-  static async getStore(id: string, currentUser: CurrentUser): Promise<Store> {
+  static async getStoreById(id: string, currentUser: CurrentUser): Promise<Store> {
     if (!hasPermission(currentUser.role, PERMISSIONS.STORE_VIEW)) {
       throw new ForbiddenError();
     }
@@ -178,7 +178,7 @@ export class StoresService {
       throw new ForbiddenError(STORES_TEXT.error.forbidden_update);
     }
 
-    const existing = await this.getStore(id, currentUser);
+    const existing = await this.getStoreById(id, currentUser);
 
     const name = data.name !== undefined ? data.name : existing.name;
 
