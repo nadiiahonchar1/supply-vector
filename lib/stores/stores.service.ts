@@ -19,25 +19,16 @@ type StoreRow = {
   name: string;
   city: string;
   address: string;
-  latitude: string | number | null;
-  longitude: string | number | null;
+  latitude: number | null;
+  longitude: number | null;
   is_storage_node: boolean;
-  max_capacity: string | number | null;
+  max_capacity: number | null;
   is_active: boolean;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
-
-function normalizeStore(row: StoreRow): Store {
-  return {
-    ...row,
-    latitude: row.latitude !== null ? Number(row.latitude) : null,
-    longitude: row.longitude !== null ? Number(row.longitude) : null,
-    max_capacity: row.max_capacity !== null ? Number(row.max_capacity) : null,
-  };
-}
 
 export class StoresService {
   static async getStores(currentUser: CurrentUser): Promise<Store[]> {
@@ -65,7 +56,7 @@ export class StoresService {
       ORDER BY name, city, address
     `) as StoreRow[];
 
-    return rows.map(normalizeStore);
+     return rows;
   }
 
   static async getStoreById(id: string, currentUser: CurrentUser): Promise<Store> {
@@ -97,7 +88,7 @@ export class StoresService {
       throw new NotFoundError(STORES_TEXT.error.empty_store);
     }
 
-    return normalizeStore(rows[0]);
+    return rows[0];
   }
 
   static async createStore(
@@ -166,7 +157,7 @@ export class StoresService {
         updated_at
     `) as StoreRow[];
 
-    return normalizeStore(rows[0]);
+    return rows[0];
   }
 
   static async updateStore(
@@ -254,6 +245,6 @@ export class StoresService {
       throw new NotFoundError(STORES_TEXT.error.empty_store);
     }
 
-    return normalizeStore(rows[0]);
+    return rows[0];
   }
 }
