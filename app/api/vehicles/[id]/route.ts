@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: Params) {
     const currentUser = await requireUser();
     const { id } = await params;
 
-    const vehicle = await VehiclesService.getVehicle(id, currentUser);
+    const vehicle = await VehiclesService.getVehicleById(id, currentUser);
 
     return NextResponse.json(vehicle);
   } catch (error) {
