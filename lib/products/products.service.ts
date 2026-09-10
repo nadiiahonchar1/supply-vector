@@ -66,7 +66,7 @@ export class ProductsService {
     return rows.map(normalizeProduct);
   }
 
-  static async getProduct(
+  static async getProductById(
     id: string,
     currentUser: CurrentUser,
   ): Promise<Product> {
@@ -173,7 +173,7 @@ export class ProductsService {
       throw new ForbiddenError(PRODUCT_TEXT.error.forbidden_update);
     }
 
-    const existing = await this.getProduct(id, currentUser);
+    const existing = await this.getProductById(id, currentUser);
 
     const name = data.name !== undefined ? data.name : existing.name;
 

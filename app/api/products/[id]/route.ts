@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: Params) {
     const currentUser = await requireUser();
     const { id } = await params;
 
-    const product = await ProductsService.getProduct(id, currentUser);
+    const product = await ProductsService.getProductById(id, currentUser);
 
     return NextResponse.json(product);
   } catch (error) {
