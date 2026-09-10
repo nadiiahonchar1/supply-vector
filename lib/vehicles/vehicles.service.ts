@@ -18,10 +18,10 @@ type VehicleRow = {
   id: string;
   name: string;
   type: string;
-  capacity_weight: string | number;
-  capacity_volume: string | number | null;
-  cost_per_km: string | number;
-  fixed_cost: string | number;
+  capacity_weight: number;
+  capacity_volume: number | null;
+  cost_per_km: number;
+  fixed_cost: number;
   available_from: string | null;
   available_to: string | null;
   is_active: boolean;
@@ -30,17 +30,6 @@ type VehicleRow = {
   created_at: string;
   updated_at: string;
 };
-
-function normalizeVehicle(row: VehicleRow): Vehicle {
-  return {
-    ...row,
-    capacity_weight: Number(row.capacity_weight),
-    capacity_volume:
-      row.capacity_volume !== null ? Number(row.capacity_volume) : null,
-    cost_per_km: Number(row.cost_per_km),
-    fixed_cost: Number(row.fixed_cost),
-  };
-}
 
 function validateAvailability(
   availableFrom: string | null,
@@ -82,7 +71,7 @@ export class VehiclesService {
   ORDER BY name
     `) as VehicleRow[];
 
-    return rows.map(normalizeVehicle);
+    return rows;
   }
 
   static async getVehicleById(
@@ -118,7 +107,7 @@ export class VehiclesService {
       throw new NotFoundError(VEHICLE_TEXT.error.empty_vehicle);
     }
 
-    return normalizeVehicle(rows[0]);
+    return rows[0];
   }
 
   static async createVehicle(
@@ -182,7 +171,7 @@ export class VehiclesService {
         updated_at
     `) as VehicleRow[];
 
-    return normalizeVehicle(rows[0]);
+    return rows[0];
   }
 
   static async updateVehicle(
@@ -267,6 +256,6 @@ export class VehiclesService {
       throw new NotFoundError(VEHICLE_TEXT.error.empty_vehicle);
     }
 
-    return normalizeVehicle(rows[0]);
+    return rows[0];
   }
 }
