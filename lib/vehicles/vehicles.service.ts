@@ -52,23 +52,23 @@ export class VehiclesService {
 
     const rows = (await sql`
       SELECT
-    id,
-    name,
-    type,
-    capacity_weight,
-    capacity_volume,
-    cost_per_km,
-    fixed_cost,
-    available_from,
-    available_to,
-    is_active,
-    created_by,
-    updated_by,
-    created_at,
-    updated_at
-  FROM vehicles
-  WHERE is_active = TRUE
-  ORDER BY name
+        id,
+        name,
+        type,
+        capacity_weight,
+        capacity_volume,
+        cost_per_km,
+        fixed_cost,
+        available_from,
+        available_to,
+        is_active,
+        created_by,
+        updated_by,
+        created_at,
+        updated_at
+      FROM vehicles
+      WHERE is_active = TRUE
+      ORDER BY name
     `) as VehicleRow[];
 
     return rows;
