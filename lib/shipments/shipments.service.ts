@@ -114,18 +114,18 @@ export class ShipmentsService {
     }
 
     const transferRequests = (await sql`
-      SELECT
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        status,
-        shipment_id
-      FROM transfer_requests
-      WHERE id = ${data.transfer_request_id}
-      LIMIT 1
-    `) as TransferRequestRow[];
+    SELECT
+      id,
+      source_store_id,
+      destination_store_id,
+      product_id,
+      quantity,
+      status,
+      shipment_id
+    FROM transfer_requests
+    WHERE id = ${data.transfer_request_id}
+    LIMIT 1
+  `) as TransferRequestRow[];
 
     if (!transferRequests.length) {
       throw new NotFoundError(SHIPMENT_TEXT.error.transfer_request_not_found);
@@ -138,73 +138,101 @@ export class ShipmentsService {
     }
 
     if (
-      transferRequest.status !== "approved" &&
-      transferRequest.status !== "pending"
+      transferRequest.status !== "pending" &&
+      transferRequest.status !== "approved"
     ) {
       throw new ValidationError(SHIPMENT_TEXT.error.invalid_transfer_request);
     }
 
     const shipmentId = crypto.randomUUID();
-
     const shipmentNumber = `SHP-${Date.now()}`;
 
-    const [createdShipments] = (await sql.transaction([
-      sql`
-        INSERT INTO shipments (
-          id,
-          shipment_number,
-          source_store_id,
-          destination_store_id,
-          status,
-          created_by,
-          updated_by
-        )
-        VALUES (
-          ${shipmentId},
-          ${shipmentNumber},
-          ${transferRequest.source_store_id},
-          ${transferRequest.destination_store_id},
-          'pending',
-          ${currentUser.id},
-          ${currentUser.id}
-        )
-        RETURNING
-          id,
-          shipment_number,
-          source_store_id,
-          destination_store_id,
-          status,
-          created_by,
-          updated_by,
-          created_at,
-          updated_at,
-          completed_at
-      `,
+    const rows = (await sql`
+    WITH reserved_inventory AS (
+      UPDATE inventory
+      SET
+        reserved_quantity =
+          reserved_quantity + ${transferRequest.quantity}
+      WHERE store_id = ${transferRequest.source_store_id}
+        AND product_id = ${transferRequest.product_id}
+        AND quantity - reserved_quantity >= ${transferRequest.quantity}
+      RETURNING store_id, product_id
+    ),
 
-      sql`
-        INSERT INTO shipment_items (
-          shipment_id,
-          product_id,
-          quantity
-        )
-        VALUES (
-          ${shipmentId},
-          ${transferRequest.product_id},
-          ${transferRequest.quantity}
-        )
-      `,
+    created_shipment AS (
+      INSERT INTO shipments (
+        id,
+        shipment_number,
+        source_store_id,
+        destination_store_id,
+        status,
+        created_by,
+        updated_by
+      )
+      SELECT
+        ${shipmentId},
+        ${shipmentNumber},
+        ${transferRequest.source_store_id},
+        ${transferRequest.destination_store_id},
+        'pending',
+        ${currentUser.id},
+        ${currentUser.id}
+      FROM reserved_inventory
+      RETURNING
+        id,
+        shipment_number,
+        source_store_id,
+        destination_store_id,
+        status,
+        created_by,
+        updated_by,
+        created_at,
+        updated_at,
+        completed_at
+    ),
 
-      sql`
-        UPDATE transfer_requests
-        SET
-          shipment_id = ${shipmentId},
-          updated_by = ${currentUser.id},
-          updated_at = NOW()
-        WHERE id = ${transferRequest.id}
-      `,
-    ])) as [ShipmentRow[], unknown, unknown];
+    created_item AS (
+      INSERT INTO shipment_items (
+        shipment_id,
+        product_id,
+        quantity
+      )
+      SELECT
+        ${shipmentId},
+        ${transferRequest.product_id},
+        ${transferRequest.quantity}
+      FROM created_shipment
+    )
 
-    return createdShipments[0];
+    UPDATE transfer_requests
+    SET
+      shipment_id = ${shipmentId},
+      updated_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${transferRequest.id}
+      AND EXISTS (
+        SELECT 1
+        FROM created_shipment
+      )
+
+    RETURNING
+      ${shipmentId} AS id,
+      ${shipmentNumber} AS shipment_number,
+      ${transferRequest.source_store_id} AS source_store_id,
+      ${transferRequest.destination_store_id} AS destination_store_id,
+      'pending' AS status,
+      ${currentUser.id} AS created_by,
+      ${currentUser.id} AS updated_by,
+      NOW() AS created_at,
+      NOW() AS updated_at,
+      NULL::timestamp AS completed_at
+  `) as ShipmentRow[];
+
+    if (!rows.length) {
+      throw new ValidationError(SHIPMENT_TEXT.error.insufficient_inventory);
+    }
+
+    return rows[0];
   }
 
   static async updateShipment(

@@ -8,6 +8,7 @@ export const SHIPMENT_TEXT = {
     invalid_status_transition: "Некоректна зміна статусу відправлення",
     forbidden_create: "Недостатньо прав для створення відправлення",
     forbidden_update: "Недостатньо прав для зміни відправлення",
+    insufficient_inventory: "Недостатньо доступного товару на складі",
   },
   success: {
     created: "Відправлення успішно створено",
