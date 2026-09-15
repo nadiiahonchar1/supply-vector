@@ -1,28 +1,51 @@
 import { NextResponse } from "next/server";
 
-import { getShipmentsQuery } from "@/features/shipments/queries/get-shipments-query";
+import { requireUser } from "@/lib/auth/auth-service";
+import { AuditService } from "@/lib/audit/audit.service";
+import { handleApiError } from "@/lib/errors/handle-api-error";
+import { validate } from "@/lib/validation/validate";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+import { ShipmentsService } from "@/lib/shipments/shipments.service";
+import { createShipmentSchema } from "@/features/shipments/validation/shipment.schema";
 
-  const status = searchParams.get("status") ?? undefined;
+export async function GET() {
+  try {
+    const currentUser = await requireUser();
 
-  const sourceStoreId = searchParams.get("sourceStoreId") ?? undefined;
+    const shipments = await ShipmentsService.getShipments(currentUser);
 
-  const destinationStoreId =
-    searchParams.get("destinationStoreId") ?? undefined;
+    return NextResponse.json(shipments);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
-  const shipments = await getShipmentsQuery({
-    status: status as
-      | "pending"
-      | "in_transit"
-      | "completed"
-      | "cancelled"
-      | undefined,
+export async function POST(request: Request) {
+  try {
+    const currentUser = await requireUser();
 
-    sourceStoreId,
-    destinationStoreId,
-  });
+    const body = await request.json();
 
-  return NextResponse.json(shipments);
+    const input = validate(createShipmentSchema, body);
+
+    const shipment = await ShipmentsService.createShipment(input, currentUser);
+
+    await AuditService.log({
+      userId: currentUser.id,
+      action: "shipment:create",
+      entity: "shipment",
+      entityId: shipment.id,
+      meta: {
+        shipment_number: shipment.shipment_number,
+        source_store_id: shipment.source_store_id,
+        destination_store_id: shipment.destination_store_id,
+      },
+    });
+
+    return NextResponse.json(shipment, {
+      status: 201,
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
