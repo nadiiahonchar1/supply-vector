@@ -327,18 +327,18 @@ export class ShipmentsService {
         sd.shipment_item_id
     ),
 
-    validation AS (
-      SELECT
-        CASE
-          WHEN
-            (SELECT COUNT(*) FROM shipment_data) = 0
-            OR
-            (SELECT COUNT(*) FROM source_inventory)
-              <>
-            (SELECT COUNT(*) FROM shipment_data)
-          THEN 1 / 0
-          ELSE 1
-        END AS valid
+    valid_source AS (
+      SELECT 1
+      WHERE
+        (SELECT COUNT(*) FROM shipment_data) > 0
+        AND
+        (
+          SELECT COUNT(*)
+          FROM source_inventory
+        ) = (
+          SELECT COUNT(*)
+          FROM shipment_data
+        )
     ),
 
     transfer_out_movements AS (
@@ -364,8 +364,19 @@ export class ShipmentsService {
         si.shipment_item_id,
         ${currentUser.id}
       FROM source_inventory si
-      CROSS JOIN validation
+      CROSS JOIN valid_source
       RETURNING id
+    ),
+
+    destination_before AS (
+      SELECT
+        i.product_id,
+        i.quantity AS quantity_before
+      FROM inventory i
+      JOIN shipment_data sd
+        ON sd.product_id = i.product_id
+      CROSS JOIN valid_source
+      WHERE i.store_id = ${shipment.destination_store_id}
     ),
 
     destination_inventory AS (
@@ -381,7 +392,7 @@ export class ShipmentsService {
         sd.quantity,
         0
       FROM shipment_data sd
-      CROSS JOIN validation
+      CROSS JOIN valid_source
       ON CONFLICT (store_id, product_id)
       DO UPDATE
       SET
@@ -389,13 +400,7 @@ export class ShipmentsService {
           inventory.quantity + EXCLUDED.quantity
       RETURNING
         product_id,
-        quantity - (
-          SELECT sd.quantity
-          FROM shipment_data sd
-          WHERE sd.product_id = inventory.product_id
-          LIMIT 1
-        ) AS quantity_before,
-        quantity AS quantity_after
+        quantity
     ),
 
     transfer_in_movements AS (
@@ -414,8 +419,8 @@ export class ShipmentsService {
         ${shipment.destination_store_id},
         di.product_id,
         sd.quantity,
-        di.quantity_before,
-        di.quantity_after,
+        COALESCE(db.quantity_before, 0),
+        di.quantity,
         'transfer_in',
         ${shipment.id},
         sd.shipment_item_id,
@@ -423,7 +428,9 @@ export class ShipmentsService {
       FROM destination_inventory di
       JOIN shipment_data sd
         ON sd.product_id = di.product_id
-      CROSS JOIN validation
+      LEFT JOIN destination_before db
+        ON db.product_id = di.product_id
+      CROSS JOIN valid_source
       RETURNING id
     ),
 
@@ -498,48 +505,35 @@ export class ShipmentsService {
         i.product_id,
         i.reserved_quantity + sd.quantity AS reserved_before,
         i.reserved_quantity AS reserved_after,
-        sd.quantity
+        sd.quantity,
+        sd.shipment_item_id
     ),
 
-    validation AS (
-      SELECT
-        CASE
-          WHEN
-            (SELECT COUNT(*) FROM shipment_data) = 0
-            OR
-            (SELECT COUNT(*) FROM released_inventory)
-              <>
-            (SELECT COUNT(*) FROM shipment_data)
-          THEN 1 / 0
-          ELSE 1
-        END AS valid
-    ),
-
-    updated_shipment AS (
-      UPDATE shipments
-      SET
-        status = 'cancelled',
-        updated_by = ${currentUser.id},
-        updated_at = NOW()
-      WHERE id = ${shipment.id}
-        AND EXISTS (
-          SELECT 1
-          FROM validation
+    valid_inventory AS (
+      SELECT 1
+      WHERE
+        (SELECT COUNT(*) FROM shipment_data) > 0
+        AND
+        (
+          SELECT COUNT(*)
+          FROM released_inventory
+        ) = (
+          SELECT COUNT(*)
+          FROM shipment_data
         )
-      RETURNING
-        id,
-        shipment_number,
-        source_store_id,
-        destination_store_id,
-        status,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        completed_at
     )
 
-    SELECT
+    UPDATE shipments
+    SET
+      status = 'cancelled',
+      updated_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${shipment.id}
+      AND EXISTS (
+        SELECT 1
+        FROM valid_inventory
+      )
+    RETURNING
       id,
       shipment_number,
       source_store_id,
@@ -550,7 +544,6 @@ export class ShipmentsService {
       created_at,
       updated_at,
       completed_at
-    FROM updated_shipment
   `) as ShipmentRow[];
 
     if (!rows.length) {
