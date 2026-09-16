@@ -434,7 +434,7 @@ export class ShipmentsService {
       RETURNING id
     ),
 
-    updated_transfer_request AS (
+   updated_transfer_request AS (
       UPDATE transfer_requests
       SET
         status = 'fulfilled',
@@ -442,6 +442,10 @@ export class ShipmentsService {
         updated_at = NOW()
       WHERE shipment_id = ${shipment.id}
         AND status IN ('pending', 'approved')
+        AND EXISTS (
+          SELECT 1
+          FROM valid_source
+        )
       RETURNING id
     )
 
