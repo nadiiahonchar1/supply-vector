@@ -11,6 +11,7 @@ export const SHIPMENT_TEXT = {
     insufficient_inventory: "Недостатньо доступного товару на складі",
     invalid_shipment_completion: "Не вдалося завершити відправлення",
     invalid_shipment_cancellation: "Не вдалося скасувати відправлення",
+    forbidden_cancel: "Недостатньо прав для скасування відправлення",
   },
   success: {
     created: "Відправлення успішно створено",
