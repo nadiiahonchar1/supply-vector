@@ -250,31 +250,189 @@ export class ShipmentsService {
       throw new ValidationError(SHIPMENT_TEXT.error.invalid_status_transition);
     }
 
-    const completedAt = data.status === "completed" ? new Date() : null;
+    if (data.status === "completed") {
+      return this.completeShipment(shipment, currentUser);
+    }
+
+    if (data.status === "cancelled") {
+      return this.cancelShipment(shipment, currentUser);
+    }
 
     const rows = (await sql`
-      UPDATE shipments
-      SET
-        status = ${data.status},
-        updated_by = ${currentUser.id},
-        updated_at = NOW(),
-        completed_at = ${completedAt}
-      WHERE id = ${id}
-      RETURNING
-        id,
-        shipment_number,
-        source_store_id,
-        destination_store_id,
-        status,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        completed_at
-    `) as ShipmentRow[];
+    UPDATE shipments
+    SET
+      status = ${data.status},
+      updated_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING
+      id,
+      shipment_number,
+      source_store_id,
+      destination_store_id,
+      status,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at,
+      completed_at
+  `) as ShipmentRow[];
 
     if (!rows.length) {
       throw new NotFoundError(SHIPMENT_TEXT.error.empty_shipment);
+    }
+
+    return rows[0];
+  }
+
+  private static async completeShipment(
+    shipment: Shipment,
+    currentUser: CurrentUser,
+  ): Promise<Shipment> {
+    const rows = (await sql`
+    WITH shipment_data AS (
+      SELECT
+        si.product_id,
+        si.quantity
+      FROM shipment_items si
+      WHERE si.shipment_id = ${shipment.id}
+    ),
+
+    updated_inventory AS (
+      UPDATE inventory i
+      SET
+        quantity = quantity - sd.quantity,
+        reserved_quantity =
+          reserved_quantity - sd.quantity
+      FROM shipment_data sd
+      WHERE i.store_id = ${shipment.source_store_id}
+        AND i.product_id = sd.product_id
+        AND i.reserved_quantity >= sd.quantity
+        AND i.quantity >= sd.quantity
+      RETURNING i.product_id
+    ),
+
+    updated_destination_inventory AS (
+      INSERT INTO inventory (
+        store_id,
+        product_id,
+        quantity,
+        reserved_quantity
+      )
+      SELECT
+        ${shipment.destination_store_id},
+        sd.product_id,
+        sd.quantity,
+        0
+      FROM shipment_data sd
+      ON CONFLICT (store_id, product_id)
+      DO UPDATE
+      SET
+        quantity =
+          inventory.quantity + EXCLUDED.quantity
+      RETURNING product_id
+    ),
+
+    updated_transfer_requests AS (
+      UPDATE transfer_requests
+      SET
+        status = 'fulfilled',
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      WHERE shipment_id = ${shipment.id}
+        AND status IN ('pending', 'approved')
+      RETURNING id
+    )
+
+    UPDATE shipments
+    SET
+      status = 'completed',
+      completed_at = NOW(),
+      updated_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${shipment.id}
+      AND EXISTS (
+        SELECT 1
+        FROM updated_inventory
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM updated_transfer_requests
+      )
+    RETURNING
+      id,
+      shipment_number,
+      source_store_id,
+      destination_store_id,
+      status,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at,
+      completed_at
+  `) as ShipmentRow[];
+
+    if (!rows.length) {
+      throw new ValidationError(
+        SHIPMENT_TEXT.error.invalid_shipment_completion,
+      );
+    }
+
+    return rows[0];
+  }
+
+  private static async cancelShipment(
+    shipment: Shipment,
+    currentUser: CurrentUser,
+  ): Promise<Shipment> {
+    const rows = (await sql`
+    WITH shipment_data AS (
+      SELECT
+        si.product_id,
+        si.quantity
+      FROM shipment_items si
+      WHERE si.shipment_id = ${shipment.id}
+    ),
+
+    released_inventory AS (
+      UPDATE inventory i
+      SET
+        reserved_quantity =
+          reserved_quantity - sd.quantity
+      FROM shipment_data sd
+      WHERE i.store_id = ${shipment.source_store_id}
+        AND i.product_id = sd.product_id
+        AND i.reserved_quantity >= sd.quantity
+      RETURNING i.product_id
+    )
+
+    UPDATE shipments
+    SET
+      status = 'cancelled',
+      updated_by = ${currentUser.id},
+      updated_at = NOW()
+    WHERE id = ${shipment.id}
+      AND EXISTS (
+        SELECT 1
+        FROM released_inventory
+      )
+    RETURNING
+      id,
+      shipment_number,
+      source_store_id,
+      destination_store_id,
+      status,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at,
+      completed_at
+  `) as ShipmentRow[];
+
+    if (!rows.length) {
+      throw new ValidationError(
+        SHIPMENT_TEXT.error.invalid_shipment_cancellation,
+      );
     }
 
     return rows[0];
