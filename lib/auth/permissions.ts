@@ -50,6 +50,12 @@ export const PERMISSIONS = {
   VEHICLE_VIEW: "vehicle:view",
   VEHICLE_CREATE: "vehicle:create",
   VEHICLE_UPDATE: "vehicle:update",
+
+  //TRANSFER_REQUEST
+  TRANSFER_REQUEST_VIEW: "transfer_request:view",
+  TRANSFER_REQUEST_CREATE: "transfer_request:create",
+  TRANSFER_REQUEST_UPDATE: "transfer_request:update",
+  TRANSFER_REQUEST_CANCEL: "transfer_request:cancel",
 } as const;
 
 // =====================================
