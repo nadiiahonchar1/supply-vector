@@ -212,16 +212,6 @@ export class TransferRequestsService {
       );
     }
 
-    if (
-      data.earliest_delivery &&
-      data.latest_delivery &&
-      new Date(data.latest_delivery) < new Date(data.earliest_delivery)
-    ) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
-      );
-    }
-
     const nextStatus = data.status ?? transferRequest.status;
 
     this.validateStatusTransition(transferRequest.status, nextStatus);
@@ -234,47 +224,61 @@ export class TransferRequestsService {
       }
     }
 
+    const nextEarliestDelivery =
+      data.earliest_delivery !== undefined
+        ? data.earliest_delivery
+        : transferRequest.earliest_delivery;
+
+    const nextLatestDelivery =
+      data.latest_delivery !== undefined
+        ? data.latest_delivery
+        : transferRequest.latest_delivery;
+
+    if (
+      nextEarliestDelivery &&
+      nextLatestDelivery &&
+      new Date(nextLatestDelivery) < new Date(nextEarliestDelivery)
+    ) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
+      );
+    }
+
     const rows = (await sql`
-      UPDATE transfer_requests
-      SET
-        priority = COALESCE(
-          ${data.priority ?? null},
-          priority
-        ),
-        status = ${nextStatus},
-        earliest_delivery = COALESCE(
-          ${data.earliest_delivery ?? null},
-          earliest_delivery
-        ),
-        latest_delivery = COALESCE(
-          ${data.latest_delivery ?? null},
-          latest_delivery
-        ),
-        updated_by = ${currentUser.id},
-        updated_at = NOW(),
-        cancelled_at = CASE
-          WHEN ${nextStatus} = 'cancelled'
-            THEN NOW()
-          ELSE cancelled_at
-        END
-      WHERE id = ${id}
-      RETURNING
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        priority,
-        status,
-        earliest_delivery,
-        latest_delivery,
-        shipment_id,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        cancelled_at
-    `) as TransferRequestRow[];
+    UPDATE transfer_requests
+    SET
+      priority = COALESCE(
+        ${data.priority ?? null},
+        priority
+      ),
+      status = ${nextStatus},
+      earliest_delivery = ${nextEarliestDelivery},
+      latest_delivery = ${nextLatestDelivery},
+      updated_by = ${currentUser.id},
+      updated_at = NOW(),
+      cancelled_at = CASE
+        WHEN ${nextStatus} = 'cancelled'
+          THEN NOW()
+        ELSE cancelled_at
+      END
+    WHERE id = ${id}
+    RETURNING
+      id,
+      source_store_id,
+      destination_store_id,
+      product_id,
+      quantity,
+      priority,
+      status,
+      earliest_delivery,
+      latest_delivery,
+      shipment_id,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at,
+      cancelled_at
+  `) as TransferRequestRow[];
 
     if (!rows.length) {
       throw new NotFoundError(
