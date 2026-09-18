@@ -26,7 +26,11 @@ export type AuditAction =
 
 //SHIPMENTS
   | "shipment:create"
-  | "shipment:update";
+  | "shipment:update"
+
+//TRANSFER_REQUEST
+  | "transfer_request:create"
+  | "transfer_request:update";
 
 export type AuditMeta =
   | {
