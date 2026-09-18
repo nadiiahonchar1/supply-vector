@@ -28,6 +28,8 @@ export const TRANSFER_REQUEST_TEXT = {
     forbidden_update: "Недостатньо прав для зміни запиту на переміщення",
 
     forbidden_cancel: "Недостатньо прав для скасування запиту на переміщення",
+
+    forbidden_view: "Недостатньо прав для перегляду запитів на переміщення",
   },
 
   success: {

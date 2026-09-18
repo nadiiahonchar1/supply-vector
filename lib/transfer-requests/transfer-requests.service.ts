@@ -17,7 +17,7 @@ export class TransferRequestsService {
     currentUser: CurrentUser,
   ): Promise<TransferRequest[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.forbidden_update);
+      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -49,7 +49,7 @@ export class TransferRequestsService {
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.forbidden_update);
+      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
