@@ -56,6 +56,12 @@ export const PERMISSIONS = {
   TRANSFER_REQUEST_CREATE: "transfer_request:create",
   TRANSFER_REQUEST_UPDATE: "transfer_request:update",
   TRANSFER_REQUEST_CANCEL: "transfer_request:cancel",
+
+  //TRIP
+  TRIP_VIEW: "trip:view",
+  TRIP_CREATE: "trip:create",
+  TRIP_UPDATE: "trip:update",
+  TRIP_CANCEL: "trip:cancel",
 } as const;
 
 // =====================================
