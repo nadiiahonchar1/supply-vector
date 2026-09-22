@@ -8,14 +8,14 @@ import type {
   UpdateTripInput,
 } from "@/features/trips/types";
 import { TRIP_TEXT } from "@/features/trips/constants/trip-text";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
 type TripRow = Trip;
 
 export class TripsService {
   static async getTrips(currentUser: CurrentUser): Promise<Trip[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ValidationError(TRIP_TEXT.error.forbidden_view);
+      throw new ForbiddenError();
     }
 
     const rows = (await sql`
@@ -44,7 +44,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ValidationError(TRIP_TEXT.error.forbidden_view);
+      throw new ForbiddenError();
     }
 
     const rows = (await sql`
@@ -78,7 +78,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CREATE)) {
-      throw new ValidationError(TRIP_TEXT.error.forbidden_create);
+      throw new ForbiddenError();
     }
 
     if (
@@ -166,7 +166,7 @@ export class TripsService {
     const trip = await this.getTripById(id, currentUser);
 
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ValidationError(TRIP_TEXT.error.forbidden_update);
+      throw new ForbiddenError();
     }
 
     if (trip.status === "delivered") {
@@ -199,7 +199,7 @@ export class TripsService {
 
     if (nextStatus === "cancelled") {
       if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CANCEL)) {
-        throw new ValidationError(TRIP_TEXT.error.forbidden_cancel);
+        throw new ForbiddenError();
       }
     }
 
