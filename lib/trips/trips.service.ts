@@ -78,7 +78,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CREATE)) {
-      throw new ForbiddenError();
+      throw new ValidationError(TRIP_TEXT.error.forbidden_create);
     }
 
     if (
@@ -90,70 +90,82 @@ export class TripsService {
     }
 
     const vehicleRows = await sql`
-      SELECT id
-      FROM vehicles
-      WHERE id = ${data.vehicle_id}
-        AND is_active = TRUE
-      LIMIT 1
-    `;
+    SELECT id
+    FROM vehicles
+    WHERE id = ${data.vehicle_id}
+      AND is_active = TRUE
+    LIMIT 1
+  `;
 
     if (!vehicleRows.length) {
       throw new NotFoundError(TRIP_TEXT.error.vehicle_not_found);
     }
 
     const storeRows = await sql`
-      SELECT id
-      FROM stores
-      WHERE id = ${data.origin_store_id}
-        AND is_active = TRUE
-      LIMIT 1
-    `;
+    SELECT id
+    FROM stores
+    WHERE id = ${data.origin_store_id}
+      AND is_active = TRUE
+    LIMIT 1
+  `;
 
     if (!storeRows.length) {
       throw new NotFoundError(TRIP_TEXT.error.origin_store_not_found);
     }
 
+    const activeTripRows = await sql`
+    SELECT id
+    FROM trips
+    WHERE vehicle_id = ${data.vehicle_id}
+      AND status IN ('ready', 'in_transit')
+    LIMIT 1
+  `;
+
+    if (activeTripRows.length) {
+      throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
+    }
+
     const rows = (await sql`
-      INSERT INTO trips (
-        vehicle_id,
-        origin_store_id,
-        status,
-        departure_at,
-        expected_arrival_at,
-        distance_km,
-        cost,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        ${data.vehicle_id},
-        ${data.origin_store_id},
-        'planned',
-        ${data.departure_at ?? null},
-        ${data.expected_arrival_at ?? null},
-        ${data.distance_km ?? null},
-        ${data.cost ?? null},
-        ${currentUser.id},
-        ${currentUser.id},
-        NOW(),
-        NOW()
-      )
-      RETURNING
-        id,
-        vehicle_id,
-        origin_store_id,
-        status,
-        departure_at,
-        expected_arrival_at,
-        distance_km,
-        cost,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at
-    `) as TripRow[];
+    INSERT INTO trips (
+      vehicle_id,
+      origin_store_id,
+      status,
+      departure_at,
+      expected_arrival_at,
+      distance_km,
+      cost,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${data.vehicle_id},
+      ${data.origin_store_id},
+      'planned',
+      ${data.departure_at ?? null},
+      ${data.expected_arrival_at ?? null},
+      ${data.distance_km ?? null},
+      ${data.cost ?? null},
+      ${currentUser.id},
+      ${currentUser.id},
+      NOW(),
+      NOW()
+    )
+    RETURNING
+      id,
+      vehicle_id,
+      origin_store_id,
+      status,
+      departure_at,
+      expected_arrival_at,
+      distance_km,
+      cost,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at
+  `) as TripRow[];
 
     return rows[0];
   }
