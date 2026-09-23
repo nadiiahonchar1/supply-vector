@@ -23,6 +23,8 @@ export const TRIP_TEXT = {
     cannot_update_delivered: "Завершений рейс не можна змінити",
 
     cannot_update_cancelled: "Скасований рейс не можна змінити",
+
+    vehicle_already_assigned: "Транспортний засіб вже призначений на активний рейс",
   },
 
   success: {
