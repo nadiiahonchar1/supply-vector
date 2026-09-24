@@ -78,7 +78,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CREATE)) {
-      throw new ValidationError(TRIP_TEXT.error.forbidden_create);
+      throw new ForbiddenError();
     }
 
     if (
