@@ -215,6 +215,21 @@ export class TripsService {
       }
     }
 
+    if (nextStatus === "ready" || nextStatus === "in_transit") {
+      const activeTripRows = await sql`
+    SELECT id
+    FROM trips
+    WHERE vehicle_id = ${trip.vehicle_id}
+      AND status IN ('ready', 'in_transit')
+      AND id <> ${id}
+    LIMIT 1
+  `;
+
+      if (activeTripRows.length) {
+        throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
+      }
+    }
+
     const rows = (await sql`
       UPDATE trips
       SET
