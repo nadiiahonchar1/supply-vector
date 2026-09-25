@@ -74,13 +74,13 @@ export class TripItemsService {
     }
 
     const tripRows = await sql`
-      SELECT
-        id,
-        status
-      FROM trips
-      WHERE id = ${data.trip_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      status
+    FROM trips
+    WHERE id = ${data.trip_id}
+    LIMIT 1
+  `;
 
     if (!tripRows.length) {
       throw new NotFoundError(TRIP_ITEM_TEXT.error.trip_not_found);
@@ -93,16 +93,16 @@ export class TripItemsService {
     }
 
     const requestRows = await sql`
-      SELECT
-        id,
-        source_store_id,
-        destination_store_id,
-        quantity,
-        status
-      FROM transfer_requests
-      WHERE id = ${data.transfer_request_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      source_store_id,
+      destination_store_id,
+      quantity,
+      status
+    FROM transfer_requests
+    WHERE id = ${data.transfer_request_id}
+    LIMIT 1
+  `;
 
     if (!requestRows.length) {
       throw new NotFoundError(TRIP_ITEM_TEXT.error.transfer_request_not_found);
@@ -120,34 +120,19 @@ export class TripItemsService {
       throw new ValidationError(TRIP_ITEM_TEXT.error.quantity_exceeds_request);
     }
 
-    const existingRows = await sql`
-      SELECT
-        COALESCE(SUM(quantity), 0) AS assigned_quantity
-      FROM trip_items
-      WHERE transfer_request_id = ${data.transfer_request_id}
-    `;
-
-    const assignedQuantity = Number(existingRows[0]?.assigned_quantity ?? 0);
-
-    const remainingQuantity =
-      Number(transferRequest.quantity) - assignedQuantity;
-
-    if (data.quantity > remainingQuantity) {
-      throw new ValidationError(
-        TRIP_ITEM_TEXT.error.quantity_exceeds_remaining,
-      );
-    }
+    let pickupSequence: number | null = null;
 
     if (data.pickup_stop_id) {
       const pickupRows = await sql`
-        SELECT
-          id,
-          store_id
-        FROM trip_stops
-        WHERE id = ${data.pickup_stop_id}
-          AND trip_id = ${data.trip_id}
-        LIMIT 1
-      `;
+      SELECT
+        id,
+        store_id,
+        sequence
+      FROM trip_stops
+      WHERE id = ${data.pickup_stop_id}
+        AND trip_id = ${data.trip_id}
+      LIMIT 1
+    `;
 
       if (!pickupRows.length) {
         throw new ValidationError(TRIP_ITEM_TEXT.error.pickup_store_mismatch);
@@ -156,17 +141,20 @@ export class TripItemsService {
       if (pickupRows[0].store_id !== transferRequest.source_store_id) {
         throw new ValidationError(TRIP_ITEM_TEXT.error.pickup_store_mismatch);
       }
+
+      pickupSequence = Number(pickupRows[0].sequence);
     }
 
     const dropoffRows = await sql`
-      SELECT
-        id,
-        store_id
-      FROM trip_stops
-      WHERE id = ${data.dropoff_stop_id}
-        AND trip_id = ${data.trip_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      store_id,
+      sequence
+    FROM trip_stops
+    WHERE id = ${data.dropoff_stop_id}
+      AND trip_id = ${data.trip_id}
+    LIMIT 1
+  `;
 
     if (!dropoffRows.length) {
       throw new ValidationError(TRIP_ITEM_TEXT.error.dropoff_store_mismatch);
@@ -176,32 +164,67 @@ export class TripItemsService {
       throw new ValidationError(TRIP_ITEM_TEXT.error.dropoff_store_mismatch);
     }
 
+    const dropoffSequence = Number(dropoffRows[0].sequence);
+
+    if (pickupSequence !== null && pickupSequence >= dropoffSequence) {
+      throw new ValidationError(TRIP_ITEM_TEXT.error.invalid_stop_order);
+    }
+
     const rows = (await sql`
-      INSERT INTO trip_items (
-        trip_id,
-        transfer_request_id,
-        pickup_stop_id,
-        dropoff_stop_id,
-        quantity,
-        created_at
+    WITH request_lock AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(
+          ${data.transfer_request_id}::text,
+          0
+        )
       )
-      VALUES (
-        ${data.trip_id},
-        ${data.transfer_request_id},
-        ${data.pickup_stop_id ?? null},
-        ${data.dropoff_stop_id},
-        ${data.quantity},
-        NOW()
-      )
-      RETURNING
-        id,
-        trip_id,
-        transfer_request_id,
-        pickup_stop_id,
-        dropoff_stop_id,
-        quantity,
-        created_at
-    `) as TripItemRow[];
+    ),
+    current_assignment AS (
+      SELECT
+        COALESCE(SUM(ti.quantity), 0) AS assigned
+      FROM trip_items ti
+      CROSS JOIN request_lock
+      WHERE ti.transfer_request_id =
+        ${data.transfer_request_id}
+    ),
+    valid AS (
+      SELECT 1
+      FROM current_assignment ca
+      JOIN transfer_requests tr
+        ON tr.id = ${data.transfer_request_id}
+      WHERE ca.assigned + ${data.quantity} <= tr.quantity
+    )
+    INSERT INTO trip_items (
+      trip_id,
+      transfer_request_id,
+      pickup_stop_id,
+      dropoff_stop_id,
+      quantity,
+      created_at
+    )
+    SELECT
+      ${data.trip_id},
+      ${data.transfer_request_id},
+      ${data.pickup_stop_id ?? null},
+      ${data.dropoff_stop_id},
+      ${data.quantity},
+      NOW()
+    FROM valid
+    RETURNING
+      id,
+      trip_id,
+      transfer_request_id,
+      pickup_stop_id,
+      dropoff_stop_id,
+      quantity,
+      created_at
+  `) as TripItemRow[];
+
+    if (!rows.length) {
+      throw new ValidationError(
+        TRIP_ITEM_TEXT.error.quantity_exceeds_remaining,
+      );
+    }
 
     return rows[0];
   }
@@ -218,13 +241,13 @@ export class TripItemsService {
     }
 
     const tripRows = await sql`
-      SELECT
-        id,
-        status
-      FROM trips
-      WHERE id = ${tripItem.trip_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      status
+    FROM trips
+    WHERE id = ${tripItem.trip_id}
+    LIMIT 1
+  `;
 
     if (!tripRows.length) {
       throw new NotFoundError(TRIP_ITEM_TEXT.error.trip_not_found);
@@ -238,14 +261,14 @@ export class TripItemsService {
     }
 
     const requestRows = await sql`
-      SELECT
-        source_store_id,
-        destination_store_id,
-        quantity
-      FROM transfer_requests
-      WHERE id = ${tripItem.transfer_request_id}
-      LIMIT 1
-    `;
+    SELECT
+      source_store_id,
+      destination_store_id,
+      quantity
+    FROM transfer_requests
+    WHERE id = ${tripItem.transfer_request_id}
+    LIMIT 1
+  `;
 
     if (!requestRows.length) {
       throw new NotFoundError(TRIP_ITEM_TEXT.error.transfer_request_not_found);
@@ -255,21 +278,11 @@ export class TripItemsService {
 
     const nextQuantity = data.quantity ?? tripItem.quantity;
 
-    const otherItemsRows = await sql`
-      SELECT
-        COALESCE(SUM(quantity), 0) AS assigned_quantity
-      FROM trip_items
-      WHERE transfer_request_id = ${tripItem.transfer_request_id}
-        AND id <> ${id}
-    `;
-
-    const assignedElsewhere = Number(otherItemsRows[0]?.assigned_quantity ?? 0);
-
-    if (nextQuantity > Number(transferRequest.quantity) - assignedElsewhere) {
-      throw new ValidationError(
-        TRIP_ITEM_TEXT.error.quantity_exceeds_remaining,
-      );
+    if (nextQuantity <= 0) {
+      throw new ValidationError(TRIP_ITEM_TEXT.error.invalid_quantity);
     }
+
+    let pickupSequence: number | null = null;
 
     const nextPickup =
       data.pickup_stop_id !== undefined
@@ -280,14 +293,15 @@ export class TripItemsService {
 
     if (nextPickup) {
       const pickupRows = await sql`
-        SELECT
-          id,
-          store_id
-        FROM trip_stops
-        WHERE id = ${nextPickup}
-          AND trip_id = ${tripItem.trip_id}
-        LIMIT 1
-      `;
+      SELECT
+        id,
+        store_id,
+        sequence
+      FROM trip_stops
+      WHERE id = ${nextPickup}
+        AND trip_id = ${tripItem.trip_id}
+      LIMIT 1
+    `;
 
       if (!pickupRows.length) {
         throw new ValidationError(TRIP_ITEM_TEXT.error.pickup_store_mismatch);
@@ -296,17 +310,20 @@ export class TripItemsService {
       if (pickupRows[0].store_id !== transferRequest.source_store_id) {
         throw new ValidationError(TRIP_ITEM_TEXT.error.pickup_store_mismatch);
       }
+
+      pickupSequence = Number(pickupRows[0].sequence);
     }
 
     const dropoffRows = await sql`
-      SELECT
-        id,
-        store_id
-      FROM trip_stops
-      WHERE id = ${nextDropoff}
-        AND trip_id = ${tripItem.trip_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      store_id,
+      sequence
+    FROM trip_stops
+    WHERE id = ${nextDropoff}
+      AND trip_id = ${tripItem.trip_id}
+    LIMIT 1
+  `;
 
     if (!dropoffRows.length) {
       throw new ValidationError(TRIP_ITEM_TEXT.error.dropoff_store_mismatch);
@@ -316,22 +333,62 @@ export class TripItemsService {
       throw new ValidationError(TRIP_ITEM_TEXT.error.dropoff_store_mismatch);
     }
 
+    const dropoffSequence = Number(dropoffRows[0].sequence);
+
+    if (pickupSequence !== null && pickupSequence >= dropoffSequence) {
+      throw new ValidationError(TRIP_ITEM_TEXT.error.invalid_stop_order);
+    }
+
     const rows = (await sql`
-      UPDATE trip_items
-      SET
-        quantity = ${nextQuantity},
-        pickup_stop_id = ${nextPickup},
-        dropoff_stop_id = ${nextDropoff}
-      WHERE id = ${id}
-      RETURNING
-        id,
-        trip_id,
-        transfer_request_id,
-        pickup_stop_id,
-        dropoff_stop_id,
-        quantity,
-        created_at
-    `) as TripItemRow[];
+    WITH request_lock AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(
+          ${tripItem.transfer_request_id}::text,
+          0
+        )
+      )
+    ),
+    other_assignment AS (
+      SELECT
+        COALESCE(SUM(ti.quantity), 0) AS assigned
+      FROM trip_items ti
+      CROSS JOIN request_lock
+      WHERE ti.transfer_request_id =
+        ${tripItem.transfer_request_id}
+        AND ti.id <> ${id}
+    ),
+    valid AS (
+      SELECT 1
+      FROM other_assignment oa
+      JOIN transfer_requests tr
+        ON tr.id = ${tripItem.transfer_request_id}
+      WHERE oa.assigned + ${nextQuantity} <= tr.quantity
+    )
+    UPDATE trip_items
+    SET
+      quantity = ${nextQuantity},
+      pickup_stop_id = ${nextPickup},
+      dropoff_stop_id = ${nextDropoff}
+    WHERE id = ${id}
+      AND EXISTS (
+        SELECT 1
+        FROM valid
+      )
+    RETURNING
+      id,
+      trip_id,
+      transfer_request_id,
+      pickup_stop_id,
+      dropoff_stop_id,
+      quantity,
+      created_at
+  `) as TripItemRow[];
+
+    if (!rows.length) {
+      throw new ValidationError(
+        TRIP_ITEM_TEXT.error.quantity_exceeds_remaining,
+      );
+    }
 
     return rows[0];
   }
