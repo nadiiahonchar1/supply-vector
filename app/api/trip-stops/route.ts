@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 
 import { requireUser } from "@/lib/auth/auth-service";
 import { AuditService } from "@/lib/audit/audit.service";
@@ -8,11 +8,22 @@ import { validate } from "@/lib/validation";
 import { createTripStopSchema } from "@/features/trip-stops/validation/trip-stop.schema";
 import { TripStopsService } from "@/lib/trip-stops/trip-stops.service";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const currentUser = await requireUser();
 
-    const tripStops = await TripStopsService.getTripStops(currentUser);
+    const tripId = request.nextUrl.searchParams.get("trip_id");
+
+    if (!tripId) {
+      return NextResponse.json(
+        {
+          message: "trip_id is required",
+        },
+        { status: 400 },
+      );
+    }
+
+    const tripStops = await TripStopsService.getTripStops(tripId, currentUser);
 
     return NextResponse.json(tripStops);
   } catch (error) {
@@ -20,26 +31,17 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const currentUser = await requireUser();
 
-    const body: unknown = await request.json();
+    const body = await request.json();
 
-    const data = validate(createTripStopSchema, body);
+    const input = validate(createTripStopSchema, body);
 
-    const tripStop = await TripStopsService.createTripStop(data, currentUser);
+    const tripStop = await TripStopsService.createTripStop(input, currentUser);
 
-    await AuditService.log({
-      userId: currentUser.id,
-      action: "trip:update",
-      entity: "trip_stop",
-      entityId: tripStop.id,
-    });
-
-    return NextResponse.json(tripStop, {
-      status: 201,
-    });
+    return NextResponse.json(tripStop, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
