@@ -17,3 +17,13 @@ export type LogisticsDecision = {
   decided_by: string | null;
   created_at: string;
 };
+
+export type CreateLogisticsDecisionInput = {
+  transfer_request_id: string;
+  trip_id?: string | null;
+  decision_type: LogisticsDecisionType;
+  total_cost?: number | null;
+  cost_breakdown?: Record<string, unknown>;
+  reasoning: string;
+  decision_source?: LogisticsDecisionSource;
+};
