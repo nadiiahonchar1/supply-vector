@@ -343,8 +343,9 @@ export class TripStopsService {
 
     try {
       const result = await sql`
-        DELETE FROM trip_stops
-        WHERE id = ${id}
+         DELETE FROM trip_stops
+         WHERE id = ${id}
+         RETURNING id
       `;
 
       if (result.length === 0) {
