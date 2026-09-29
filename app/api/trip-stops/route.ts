@@ -41,6 +41,13 @@ export async function POST(request: NextRequest) {
 
     const tripStop = await TripStopsService.createTripStop(input, currentUser);
 
+    await AuditService.log({
+          userId: currentUser.id,
+          action: "trip:update",
+          entity: "trip_stop",
+          entityId: tripStop.id,
+        });
+
     return NextResponse.json(tripStop, { status: 201 });
   } catch (error) {
     return handleApiError(error);
