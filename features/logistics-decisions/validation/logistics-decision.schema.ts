@@ -13,5 +13,4 @@ export const createLogisticsDecisionSchema = z.object({
 
   reasoning: z.string().min(1),
 
-  decision_source: z.enum(["system", "manual"]).optional(),
 });
