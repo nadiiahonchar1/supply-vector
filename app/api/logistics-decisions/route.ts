@@ -33,11 +33,13 @@ export async function POST(request: NextRequest) {
       body,
     );
 
-    const decision =
-      await LogisticsDecisionsService.createLogisticsDecision(
-        input,
-        currentUser,
-      );
+    const decision = await LogisticsDecisionsService.createLogisticsDecision(
+      {
+        ...input,
+        decision_source: "manual",
+      },
+      currentUser,
+    );
 
     await AuditService.log({
       userId: currentUser.id,
