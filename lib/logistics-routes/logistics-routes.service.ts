@@ -7,7 +7,7 @@ import type {
   UpdateLogisticsRouteInput,
 } from "@/features/logistics-routes/types";
 import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
 type LogisticsRouteRow = LogisticsRoute;
 
@@ -16,7 +16,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ValidationError(LOGISTICS_ROUTE_TEXT.error.forbidden_view);
+      throw new ForbiddenError();
     }
 
     const rows = (await sql`
@@ -42,7 +42,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ValidationError(LOGISTICS_ROUTE_TEXT.error.forbidden_view);
+      throw new ForbiddenError();
     }
 
     const rows = (await sql`
@@ -72,7 +72,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ValidationError(LOGISTICS_ROUTE_TEXT.error.forbidden_create);
+      throw new ForbiddenError();
     }
 
     if (data.store_a_id === data.store_b_id) {
@@ -142,7 +142,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ValidationError(LOGISTICS_ROUTE_TEXT.error.forbidden_update);
+      throw new ForbiddenError();
     }
 
     const existingRows = (await sql`
