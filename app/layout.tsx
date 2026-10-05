@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 
 import "./globals.css";
 
@@ -9,13 +9,8 @@ import { AppShell } from "@/features/app-shell/AppShell";
 
 import { AppProviders } from "@/providers/AppProviders";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -35,9 +30,7 @@ export default async function RootLayout({
 
   return (
     <html lang="uk">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${inter.variable} antialiased`}>
         <AppProviders initialUser={currentUser}>
           <AppShell>{children}</AppShell>
         </AppProviders>
