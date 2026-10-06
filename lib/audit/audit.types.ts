@@ -36,6 +36,8 @@ export type AuditAction =
   | "trip:update"
 
   //INVENTORY
+  | "inventory:create"
+  | "inventory:update"
   | "inventory:viev"
   | "inventory:adjust";
 
