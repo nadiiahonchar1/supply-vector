@@ -46,7 +46,7 @@ export class InventoryService {
 
       ORDER BY s.name, p.name
     `;
-
+      
     return result as InventoryWithDetails[];
   }
 
@@ -91,7 +91,7 @@ export class InventoryService {
       throw new ForbiddenError();
     }
 
-    const storeResult = await sql`
+     const storeResult = await sql`
       SELECT
         id,
         is_active,
@@ -121,7 +121,7 @@ export class InventoryService {
         throw new ValidationError(INVENTORY_TEXT.error.store_not_storage_node);
     }
 
-    const productResult = await sql`
+     const productResult = await sql`
       SELECT
         id,
         is_active
@@ -155,8 +155,8 @@ export class InventoryService {
           INVENTORY_TEXT.error.max_stock_less_than_min_stock);      
     }
 
-    try {
-      const result = await sql`
+   try {
+     const result = await sql`
         INSERT INTO inventory (
           store_id,
           product_id,
@@ -189,14 +189,14 @@ export class InventoryService {
           updated_at
       `;
 
-      return result[0] as Inventory;
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "23505") {          
-          throw new ValidationError(INVENTORY_TEXT.error.inventory_already_exists);
-      }
+     return result[0] as Inventory;
+   } catch (error) {
+     if (error instanceof Error && "code" in error && error.code === "23505") {
+       throw new ValidationError(INVENTORY_TEXT.error.inventory_already_exists);
+     }
 
-      throw error;
-    }
+     throw error;
+   }
   }
 
   static async updateInventory(
@@ -366,8 +366,8 @@ export class InventoryService {
       if (
         data.quantity_change < 0 &&
         inventory.quantity + data.quantity_change < 0
-      ) {         
-          throw new NotFoundError(INVENTORY_TEXT.error.insufficient_quantity);
+      ) {
+        throw new NotFoundError(INVENTORY_TEXT.error.insufficient_quantity);
       }
 
       if (
@@ -375,7 +375,7 @@ export class InventoryService {
         inventory.max_stock !== null &&
         inventory.quantity + data.quantity_change > inventory.max_stock
       ) {
-          throw new NotFoundError(INVENTORY_TEXT.error.invalid_quantity_change);
+        throw new NotFoundError(INVENTORY_TEXT.error.invalid_quantity_change);
       }
 
       throw new NotFoundError(INVENTORY_TEXT.error.invalid_quantity_change);

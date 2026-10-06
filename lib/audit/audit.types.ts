@@ -33,7 +33,11 @@ export type AuditAction =
 
   //TRIP
   | "trip:create"
-  | "trip:update";
+  | "trip:update"
+
+  //INVENTORY
+  | "inventory:viev"
+  | "inventory:adjust";
 
 export type AuditMeta =
   | {
