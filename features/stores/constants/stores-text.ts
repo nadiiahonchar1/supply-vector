@@ -3,6 +3,7 @@ export const STORES_TEXT = {
     empty_store: "Магазин не знайдено",
     duplicate: "Магазин з такими даними вже існує",
     forbidden_create: "Недостатньо прав для створення магазину",
+    forbidden_view: "Недостатньо прав для перегляду магазину",
     forbidden_update: "Недостатньо прав для редагування магазину",
     invalid_coordinates: "Некоректні координати",
     invalid_capacity: "Некоректна максимальна місткість",

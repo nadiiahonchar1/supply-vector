@@ -33,7 +33,7 @@ type StoreRow = {
 export class StoresService {
   static async getStores(currentUser: CurrentUser): Promise<Store[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.STORE_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(STORES_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -61,7 +61,7 @@ export class StoresService {
 
   static async getStoreById(id: string, currentUser: CurrentUser): Promise<Store> {
     if (!hasPermission(currentUser.role, PERMISSIONS.STORE_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(STORES_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
