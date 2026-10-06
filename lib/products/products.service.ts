@@ -32,7 +32,7 @@ type ProductRow = {
 export class ProductsService {
   static async getProducts(currentUser: CurrentUser): Promise<Product[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(PRODUCT_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -62,7 +62,7 @@ export class ProductsService {
     currentUser: CurrentUser,
   ): Promise<Product> {
     if (!hasPermission(currentUser.role, PERMISSIONS.PRODUCT_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(PRODUCT_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`

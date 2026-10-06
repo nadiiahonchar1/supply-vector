@@ -3,6 +3,7 @@ export const PRODUCT_TEXT = {
     empty_product: "Товар не знайдено",
     duplicate_sku: "Товар з таким SKU вже існує",
     forbidden_create: "Недостатньо прав для створення товару",
+    forbidden_view: "Недостатньо прав для перегляду товару",
     forbidden_update: "Недостатньо прав для редагування товару",
   },
 
