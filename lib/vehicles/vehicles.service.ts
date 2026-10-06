@@ -47,7 +47,7 @@ function validateAvailability(
 export class VehiclesService {
   static async getVehicles(currentUser: CurrentUser): Promise<Vehicle[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.VEHICLE_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(VEHICLE_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -79,7 +79,7 @@ export class VehiclesService {
     currentUser: CurrentUser,
   ): Promise<Vehicle> {
     if (!hasPermission(currentUser.role, PERMISSIONS.VEHICLE_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(VEHICLE_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
