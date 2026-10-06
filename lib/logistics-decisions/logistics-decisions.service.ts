@@ -15,7 +15,7 @@ export class LogisticsDecisionsService {
     currentUser: CurrentUser,
   ): Promise<LogisticsDecision[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -42,7 +42,7 @@ export class LogisticsDecisionsService {
     currentUser: CurrentUser,
   ): Promise<LogisticsDecision> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -74,7 +74,7 @@ export class LogisticsDecisionsService {
     currentUser: CurrentUser,
   ): Promise<LogisticsDecision> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
 
     const transferRequestRows = await sql`

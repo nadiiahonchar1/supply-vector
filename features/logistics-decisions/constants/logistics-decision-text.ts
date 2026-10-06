@@ -22,6 +22,8 @@ export const LOGISTICS_DECISION_TEXT = {
 
     forbidden_view: "Недостатньо прав для перегляду логістичних рішень",
 
+    forbidden_update: "Недостатньо прав для зміни логістичних рішень",
+
     forbidden_create: "Недостатньо прав для створення логістичного рішення",
   },
 
