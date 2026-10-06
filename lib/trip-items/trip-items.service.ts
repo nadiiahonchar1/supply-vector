@@ -17,7 +17,7 @@ type TripItemRow = TripItem;
 export class TripItemsService {
   static async getTripItems(currentUser: CurrentUser): Promise<TripItem[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_ITEM_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -41,7 +41,7 @@ export class TripItemsService {
     currentUser: CurrentUser,
   ): Promise<TripItem> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_ITEM_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -70,7 +70,7 @@ export class TripItemsService {
     currentUser: CurrentUser,
   ): Promise<TripItem> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_ITEM_TEXT.error.forbidden_update);
     }
 
     const tripRows = await sql`
@@ -237,7 +237,7 @@ export class TripItemsService {
     const tripItem = await this.getTripItemById(id, currentUser);
 
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_ITEM_TEXT.error.forbidden_update);
     }
 
     const tripRows = await sql`
@@ -400,7 +400,7 @@ export class TripItemsService {
     const tripItem = await this.getTripItemById(id, currentUser);
 
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_ITEM_TEXT.error.forbidden_update);
     }
 
     const tripRows = await sql`
