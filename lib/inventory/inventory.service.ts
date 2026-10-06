@@ -9,7 +9,6 @@ import type {
 } from "@/features/inventory/types";
 import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
-// import { ApiError } from "@/lib/errors/api-error";
 import { INVENTORY_TEXT } from "@/features/inventory/constants/inventory-text";
 
 export class InventoryService {
@@ -17,7 +16,7 @@ export class InventoryService {
     currentUser: CurrentUser,
   ): Promise<InventoryWithDetails[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_view);
     }
 
     const result = await sql`
@@ -55,7 +54,7 @@ export class InventoryService {
     currentUser: CurrentUser,
   ): Promise<Inventory> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_view);
     }
 
     const result = await sql`
@@ -88,7 +87,7 @@ export class InventoryService {
     currentUser: CurrentUser,
   ): Promise<Inventory> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_ADJUST)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_create);
     }
 
      const storeResult = await sql`
@@ -205,7 +204,7 @@ export class InventoryService {
     currentUser: CurrentUser,
   ): Promise<Inventory> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_ADJUST)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_update);
     }
 
     if (data.min_stock === undefined && data.max_stock === undefined) {       
@@ -271,7 +270,7 @@ export class InventoryService {
     currentUser: CurrentUser,
   ): Promise<Inventory> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_ADJUST)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_adjust);
     }
 
     const result = await sql`
@@ -367,7 +366,7 @@ export class InventoryService {
         data.quantity_change < 0 &&
         inventory.quantity + data.quantity_change < 0
       ) {
-        throw new NotFoundError(INVENTORY_TEXT.error.insufficient_quantity);
+        throw new ValidationError(INVENTORY_TEXT.error.insufficient_quantity);
       }
 
       if (
@@ -375,10 +374,10 @@ export class InventoryService {
         inventory.max_stock !== null &&
         inventory.quantity + data.quantity_change > inventory.max_stock
       ) {
-        throw new NotFoundError(INVENTORY_TEXT.error.invalid_quantity_change);
+        throw new ValidationError(INVENTORY_TEXT.error.invalid_quantity_change);
       }
 
-      throw new NotFoundError(INVENTORY_TEXT.error.invalid_quantity_change);
+      throw new ValidationError(INVENTORY_TEXT.error.invalid_quantity_change);
     }
 
     return result[0] as Inventory;
