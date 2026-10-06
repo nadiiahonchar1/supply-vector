@@ -16,7 +16,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_ROUTE_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -42,7 +42,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_ROUTE_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -72,7 +72,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_ROUTE_TEXT.error.forbidden_update);
     }
 
     if (data.store_a_id === data.store_b_id) {
@@ -142,7 +142,7 @@ export class LogisticsRoutesService {
     currentUser: CurrentUser,
   ): Promise<LogisticsRoute> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(LOGISTICS_ROUTE_TEXT.error.forbidden_update);
     }
 
     const existingRows = (await sql`
