@@ -15,7 +15,7 @@ type TripRow = Trip;
 export class TripsService {
   static async getTrips(currentUser: CurrentUser): Promise<Trip[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -44,7 +44,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -78,7 +78,7 @@ export class TripsService {
     currentUser: CurrentUser,
   ): Promise<Trip> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CREATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_TEXT.error.forbidden_create);
     }
 
     if (
@@ -178,7 +178,7 @@ export class TripsService {
     const trip = await this.getTripById(id, currentUser);
 
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_TEXT.error.forbidden_update);
     }
 
     if (trip.status === "delivered") {
@@ -211,7 +211,7 @@ export class TripsService {
 
     if (nextStatus === "cancelled") {
       if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CANCEL)) {
-        throw new ForbiddenError();
+        throw new ForbiddenError(TRIP_TEXT.error.forbidden_cancel);
       }
     }
 
