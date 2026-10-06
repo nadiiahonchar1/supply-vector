@@ -32,7 +32,7 @@ type ShipmentItemRow = ShipmentItem;
 export class ShipmentsService {
   static async getShipments(currentUser: CurrentUser): Promise<Shipment[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.SHIPMENT_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(SHIPMENT_TEXT.error.forbidden_view);
     }
 
     return (await sql`
@@ -57,7 +57,7 @@ export class ShipmentsService {
     currentUser: CurrentUser,
   ): Promise<Shipment> {
     if (!hasPermission(currentUser.role, PERMISSIONS.SHIPMENT_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(SHIPMENT_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -89,7 +89,7 @@ export class ShipmentsService {
     currentUser: CurrentUser,
   ): Promise<ShipmentItem[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.SHIPMENT_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(SHIPMENT_TEXT.error.forbidden_view);
     }
 
     await this.getShipmentById(shipmentId, currentUser);

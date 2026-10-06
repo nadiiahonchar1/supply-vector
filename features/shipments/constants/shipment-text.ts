@@ -7,6 +7,7 @@ export const SHIPMENT_TEXT = {
       "Для цього запиту на переміщення вже створено відправлення",
     invalid_status_transition: "Некоректна зміна статусу відправлення",
     forbidden_create: "Недостатньо прав для створення відправлення",
+    forbidden_view: "Недостатньо прав для перегляду відправлення",
     forbidden_update: "Недостатньо прав для зміни відправлення",
     insufficient_inventory: "Недостатньо доступного товару на складі",
     invalid_shipment_completion: "Не вдалося завершити відправлення",
