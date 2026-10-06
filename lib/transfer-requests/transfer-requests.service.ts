@@ -17,7 +17,7 @@ export class TransferRequestsService {
     currentUser: CurrentUser,
   ): Promise<TransferRequest[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -49,7 +49,7 @@ export class TransferRequestsService {
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -88,7 +88,7 @@ export class TransferRequestsService {
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CREATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_create);
     }
 
     if (data.source_store_id === data.destination_store_id) {
@@ -197,7 +197,7 @@ export class TransferRequestsService {
     const transferRequest = await this.getTransferRequestById(id, currentUser);
 
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_update);
     }
     
 
@@ -221,7 +221,7 @@ export class TransferRequestsService {
       if (
         !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CANCEL)
       ) {
-        throw new ForbiddenError();
+        throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_cancel);
       }
     }
 
