@@ -17,7 +17,7 @@ export class TripStopsService {
     currentUser: CurrentUser,
   ): Promise<TripStop[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_STOP_TEXT.error.forbidden_view);
     }
 
     const tripRows = await sql`
@@ -52,7 +52,7 @@ export class TripStopsService {
     currentUser: CurrentUser,
   ): Promise<TripStop> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_STOP_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
@@ -80,7 +80,7 @@ export class TripStopsService {
     currentUser: CurrentUser,
   ): Promise<TripStop> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_STOP_TEXT.error.forbidden_update);
     }
 
     const tripRows = await sql`
@@ -173,7 +173,7 @@ export class TripStopsService {
     currentUser: CurrentUser,
   ): Promise<TripStop> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_STOP_TEXT.error.forbidden_update);
     }
 
     const tripStopRows = (await sql`
@@ -282,7 +282,7 @@ export class TripStopsService {
     currentUser: CurrentUser,
   ): Promise<void> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError(TRIP_STOP_TEXT.error.forbidden_update);
     }
 
     const tripStopRows = (await sql`
