@@ -1,15 +1,15 @@
 import { sql } from "@/db";
 import type { CurrentUser } from "@/features/auth";
-import type {
+import {
+  AdjustInventoryInput,
   CreateInventoryInput,
   Inventory,
   InventoryWithDetails,
   UpdateInventoryInput,
-  AdjustInventoryInput,
 } from "@/features/inventory/types";
-import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
-import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 import { INVENTORY_TEXT } from "@/features/inventory/constants/inventory-text";
+import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 export class InventoryService {
   static async getInventory(
@@ -36,16 +36,14 @@ export class InventoryService {
 
         p.name AS product_name,
         p.sku
-
       FROM inventory i
       JOIN stores s
         ON s.id = i.store_id
       JOIN products p
         ON p.id = i.product_id
-
       ORDER BY s.name, p.name
     `;
-      
+
     return result as InventoryWithDetails[];
   }
 
@@ -75,8 +73,8 @@ export class InventoryService {
 
     const inventory = result[0] as Inventory | undefined;
 
-      if (!inventory) {
-        throw new NotFoundError(INVENTORY_TEXT.error.empty_inventory);
+    if (!inventory) {
+      throw new NotFoundError(INVENTORY_TEXT.error.empty_inventory);
     }
 
     return inventory;
@@ -86,15 +84,14 @@ export class InventoryService {
     data: CreateInventoryInput,
     currentUser: CurrentUser,
   ): Promise<Inventory> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_ADJUST)) {
+    if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_CREATE)) {
       throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_create);
     }
 
-     const storeResult = await sql`
+    const storeResult = await sql`
       SELECT
         id,
-        is_active,
-        is_storage_node
+        is_active
       FROM stores
       WHERE id = ${data.store_id}
       LIMIT 1
@@ -104,23 +101,18 @@ export class InventoryService {
       | {
           id: string;
           is_active: boolean;
-          is_storage_node: boolean;
         }
       | undefined;
 
     if (!store) {
-        throw new NotFoundError(INVENTORY_TEXT.error.store_not_found);
+      throw new NotFoundError(INVENTORY_TEXT.error.store_not_found);
     }
 
     if (!store.is_active) {
-        throw new ValidationError(INVENTORY_TEXT.error.store_inactive);
+      throw new ValidationError(INVENTORY_TEXT.error.store_inactive);
     }
 
-    if (!store.is_storage_node) {
-        throw new ValidationError(INVENTORY_TEXT.error.store_not_storage_node);
-    }
-
-     const productResult = await sql`
+    const productResult = await sql`
       SELECT
         id,
         is_active
@@ -136,12 +128,12 @@ export class InventoryService {
         }
       | undefined;
 
-      if (!product) {
-          throw new NotFoundError(INVENTORY_TEXT.error.product_not_found);
+    if (!product) {
+      throw new NotFoundError(INVENTORY_TEXT.error.product_not_found);
     }
 
     if (!product.is_active) {
-        throw new ValidationError(INVENTORY_TEXT.error.product_inactive);
+      throw new ValidationError(INVENTORY_TEXT.error.product_inactive);
     }
 
     if (
@@ -150,12 +142,13 @@ export class InventoryService {
       data.min_stock !== undefined &&
       data.max_stock < data.min_stock
     ) {
-        throw new ValidationError(
-          INVENTORY_TEXT.error.max_stock_less_than_min_stock);      
+      throw new ValidationError(
+        INVENTORY_TEXT.error.max_stock_less_than_min_stock,
+      );
     }
 
-   try {
-     const result = await sql`
+    try {
+      const result = await sql`
         INSERT INTO inventory (
           store_id,
           product_id,
@@ -188,14 +181,16 @@ export class InventoryService {
           updated_at
       `;
 
-     return result[0] as Inventory;
-   } catch (error) {
-     if (error instanceof Error && "code" in error && error.code === "23505") {
-       throw new ValidationError(INVENTORY_TEXT.error.inventory_already_exists);
-     }
+      return result[0] as Inventory;
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "23505") {
+        throw new ValidationError(
+          INVENTORY_TEXT.error.inventory_already_exists,
+        );
+      }
 
-     throw error;
-   }
+      throw error;
+    }
   }
 
   static async updateInventory(
@@ -203,12 +198,8 @@ export class InventoryService {
     data: UpdateInventoryInput,
     currentUser: CurrentUser,
   ): Promise<Inventory> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_ADJUST)) {
+    if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_UPDATE)) {
       throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_update);
-    }
-
-    if (data.min_stock === undefined && data.max_stock === undefined) {       
-        throw new ValidationError(INVENTORY_TEXT.error.invalid_min_stock);
     }
 
     const currentResult = await sql`
@@ -238,8 +229,10 @@ export class InventoryService {
     const maxStock =
       data.max_stock !== undefined ? data.max_stock : current.max_stock;
 
-    if (maxStock !== null && maxStock < minStock) {      
-        throw new ValidationError(INVENTORY_TEXT.error.max_stock_less_than_min_stock);
+    if (maxStock !== null && maxStock < minStock) {
+      throw new ValidationError(
+        INVENTORY_TEXT.error.max_stock_less_than_min_stock,
+      );
     }
 
     const result = await sql`
@@ -289,8 +282,7 @@ export class InventoryService {
           id,
           store_id,
           product_id,
-          quantity - ${data.quantity_change}
-            AS quantity_before,
+          quantity - ${data.quantity_change} AS quantity_before,
           quantity AS quantity_after,
           quantity,
           reserved_quantity,
@@ -344,7 +336,6 @@ export class InventoryService {
         SELECT
           id,
           quantity,
-          reserved_quantity,
           max_stock
         FROM inventory
         WHERE id = ${id}
@@ -358,7 +349,6 @@ export class InventoryService {
       const inventory = inventoryResult[0] as {
         id: string;
         quantity: number;
-        reserved_quantity: number;
         max_stock: number | null;
       };
 
