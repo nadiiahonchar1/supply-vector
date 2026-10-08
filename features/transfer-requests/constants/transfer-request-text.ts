@@ -4,6 +4,15 @@ export const TRANSFER_REQUEST_TEXT = {
 
     source_store_not_found: "Склад-відправник не знайдено",
 
+    source_store_not_storage_node:
+      "Склад-відправник не може використовуватися як вузол зберігання",
+
+    inventory_not_found:
+      "Для цього товару на складі-відправнику немає запису залишків",
+
+    insufficient_inventory:
+      "Недостатньо доступного товару на складі-відправнику",
+
     destination_store_not_found: "Склад-отримувач не знайдено",
 
     product_not_found: "Товар не знайдено",

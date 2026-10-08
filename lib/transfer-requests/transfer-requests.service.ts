@@ -1,16 +1,27 @@
 import { sql } from "@/db";
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/features/auth/types";
-import type {
+import {
   CreateTransferRequestInput,
   TransferRequest,
   TransferRequestStatus,
   UpdateTransferRequestInput,
 } from "@/features/transfer-requests/types";
 import { TRANSFER_REQUEST_TEXT } from "@/features/transfer-requests/constants/transfer-request-text";
-import { ValidationError, NotFoundError, ForbiddenError } from "@/lib/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 type TransferRequestRow = TransferRequest;
+
+type StoreRow = {
+  id: string;
+  is_storage_node: boolean;
+};
+
+type InventoryRow = {
+  id: string;
+  quantity: number;
+  reserved_quantity: number;
+};
 
 export class TransferRequestsService {
   static async getTransferRequests(
@@ -95,25 +106,19 @@ export class TransferRequestsService {
       throw new ValidationError(TRANSFER_REQUEST_TEXT.error.same_stores);
     }
 
-    if (
-      data.earliest_delivery &&
-      data.latest_delivery &&
-      new Date(data.latest_delivery) < new Date(data.earliest_delivery)
-    ) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
-      );
-    }
+    this.validateDeliveryWindow(data.earliest_delivery, data.latest_delivery);
 
-    const storeRows = await sql`
-      SELECT id
+    const storeRows = (await sql`
+      SELECT
+        id,
+        is_storage_node
       FROM stores
       WHERE id IN (
         ${data.source_store_id},
         ${data.destination_store_id}
       )
         AND is_active = TRUE
-    `;
+    `) as StoreRow[];
 
     if (storeRows.length !== 2) {
       const sourceExists = storeRows.some(
@@ -127,6 +132,16 @@ export class TransferRequestsService {
       );
     }
 
+    const sourceStore = storeRows.find(
+      (store) => store.id === data.source_store_id,
+    );
+
+    if (!sourceStore?.is_storage_node) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.source_store_not_storage_node,
+      );
+    }
+
     const productRows = await sql`
       SELECT id
       FROM products
@@ -137,6 +152,32 @@ export class TransferRequestsService {
 
     if (!productRows.length) {
       throw new NotFoundError(TRANSFER_REQUEST_TEXT.error.product_not_found);
+    }
+
+    const inventoryRows = (await sql`
+      SELECT
+        id,
+        quantity,
+        reserved_quantity
+      FROM inventory
+      WHERE store_id = ${data.source_store_id}
+        AND product_id = ${data.product_id}
+      LIMIT 1
+    `) as InventoryRow[];
+
+    if (!inventoryRows.length) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.inventory_not_found,
+      );
+    }
+
+    const inventory = inventoryRows[0];
+    const availableQuantity = inventory.quantity - inventory.reserved_quantity;
+
+    if (availableQuantity < data.quantity) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.insufficient_inventory,
+      );
     }
 
     const rows = (await sql`
@@ -194,12 +235,11 @@ export class TransferRequestsService {
     data: UpdateTransferRequestInput,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    const transferRequest = await this.getTransferRequestById(id, currentUser);
-
     if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_UPDATE)) {
       throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_update);
     }
-    
+
+    const transferRequest = await this.getTransferRequestById(id, currentUser);
 
     if (transferRequest.status === "fulfilled") {
       throw new ValidationError(
@@ -235,51 +275,47 @@ export class TransferRequestsService {
         ? data.latest_delivery
         : transferRequest.latest_delivery;
 
-    if (
-      nextEarliestDelivery &&
-      nextLatestDelivery &&
-      new Date(nextLatestDelivery) < new Date(nextEarliestDelivery)
-    ) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
-      );
+    this.validateDeliveryWindow(nextEarliestDelivery, nextLatestDelivery);
+
+    if (transferRequest.status === "pending" && nextStatus === "approved") {
+      await this.validateAvailableInventory(transferRequest);
     }
 
     const rows = (await sql`
-    UPDATE transfer_requests
-    SET
-      priority = COALESCE(
-        ${data.priority ?? null},
-        priority
-      ),
-      status = ${nextStatus},
-      earliest_delivery = ${nextEarliestDelivery},
-      latest_delivery = ${nextLatestDelivery},
-      updated_by = ${currentUser.id},
-      updated_at = NOW(),
-      cancelled_at = CASE
-        WHEN ${nextStatus} = 'cancelled'
-          THEN NOW()
-        ELSE cancelled_at
-      END
-    WHERE id = ${id}
-    RETURNING
-      id,
-      source_store_id,
-      destination_store_id,
-      product_id,
-      quantity,
-      priority,
-      status,
-      earliest_delivery,
-      latest_delivery,
-      shipment_id,
-      created_by,
-      updated_by,
-      created_at,
-      updated_at,
-      cancelled_at
-  `) as TransferRequestRow[];
+      UPDATE transfer_requests
+      SET
+        priority = COALESCE(
+          ${data.priority ?? null},
+          priority
+        ),
+        status = ${nextStatus},
+        earliest_delivery = ${nextEarliestDelivery},
+        latest_delivery = ${nextLatestDelivery},
+        updated_by = ${currentUser.id},
+        updated_at = NOW(),
+        cancelled_at = CASE
+          WHEN ${nextStatus} = 'cancelled'
+            THEN NOW()
+          ELSE cancelled_at
+        END
+      WHERE id = ${id}
+      RETURNING
+        id,
+        source_store_id,
+        destination_store_id,
+        product_id,
+        quantity,
+        priority,
+        status,
+        earliest_delivery,
+        latest_delivery,
+        shipment_id,
+        created_by,
+        updated_by,
+        created_at,
+        updated_at,
+        cancelled_at
+    `) as TransferRequestRow[];
 
     if (!rows.length) {
       throw new NotFoundError(
@@ -288,6 +324,52 @@ export class TransferRequestsService {
     }
 
     return rows[0];
+  }
+
+  private static async validateAvailableInventory(
+    transferRequest: TransferRequest,
+  ): Promise<void> {
+    const inventoryRows = (await sql`
+      SELECT
+        id,
+        quantity,
+        reserved_quantity
+      FROM inventory
+      WHERE store_id = ${transferRequest.source_store_id}
+        AND product_id = ${transferRequest.product_id}
+      LIMIT 1
+    `) as InventoryRow[];
+
+    if (!inventoryRows.length) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.inventory_not_found,
+      );
+    }
+
+    const inventory = inventoryRows[0];
+
+    const availableQuantity = inventory.quantity - inventory.reserved_quantity;
+
+    if (availableQuantity < transferRequest.quantity) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.insufficient_inventory,
+      );
+    }
+  }
+
+  private static validateDeliveryWindow(
+    earliestDelivery: string | null | undefined,
+    latestDelivery: string | null | undefined,
+  ): void {
+    if (
+      earliestDelivery &&
+      latestDelivery &&
+      new Date(latestDelivery) < new Date(earliestDelivery)
+    ) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
+      );
+    }
   }
 
   private static validateStatusTransition(
