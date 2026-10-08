@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
-import { validate } from "@/lib/validation/validate";
-import { createInventorySchema } from "@/features/inventory/validation/inventory.schema";
 import { InventoryService } from "@/lib/inventory/inventory.service";
 import { AuditService } from "@/lib/audit/audit.service";
+import { validate } from "@/lib/validation";
+import { createInventorySchema } from "@/features/inventory/validation/inventory.schema";
+import { requireUser } from "@/lib/auth/auth-service";
+import { handleApiError } from "@/lib/errors/handle-api-error";
 
 export async function GET() {
   try {
@@ -33,17 +33,18 @@ export async function POST(request: NextRequest) {
 
     await AuditService.log({
       userId: currentUser.id,
-      action: "inventory:adjust",
+      action: "inventory:create",
       entity: "inventory",
       entityId: inventory.id,
       meta: {
-        action: "create",
+        store_id: inventory.store_id,
+        product_id: inventory.product_id,
+        min_stock: inventory.min_stock,
+        max_stock: inventory.max_stock,
       },
     });
 
-    return NextResponse.json(inventory, {
-      status: 201,
-    });
+    return NextResponse.json(inventory, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
