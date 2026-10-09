@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-
-import { ProfileService } from "@/lib/profile/profile.service";
+import { ProfileService } from "@/lib/profile";
 import { validate } from "@/lib/validation/validate";
 import { handleApiError } from "@/lib/errors/handle-api-error";
-
 import { changePasswordSchema } from "@/features/profile/validation/password.schema";
 
 export async function POST(req: Request) {
