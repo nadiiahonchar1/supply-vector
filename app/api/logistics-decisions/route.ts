@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createLogisticsDecisionSchema } from "@/features/logistics-decisions/validation/logistics-decision.schema";
-import { AuditService } from "@/lib/audit/audit.service";
+import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/auth-service";
 import { handleApiError } from "@/lib/errors/handle-api-error";
-import { LogisticsDecisionsService } from "@/lib/logistics-decisions/logistics-decisions.service";
+import { LogisticsDecisionsService } from "@/lib/logistics-decisions";
 import { validate } from "@/lib/validation";
 
 export async function GET() {
