@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { updateLogisticsRouteSchema } from "@/features/logistics-routes/validation/logistics-route.schema";
-import { AuditService } from "@/lib/audit/audit.service";
+import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/auth-service";
 import { handleApiError } from "@/lib/errors/handle-api-error";
-import { LogisticsRoutesService } from "@/lib/logistics-routes/logistics-routes.service";
+import { LogisticsRoutesService } from "@/lib/logistics-routes";
 import { validate } from "@/lib/validation";
 
 type RouteContext = {
