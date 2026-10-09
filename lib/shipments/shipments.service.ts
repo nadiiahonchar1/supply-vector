@@ -15,16 +15,6 @@ import type {
 
 import { SHIPMENT_TEXT } from "@/features/shipments/constants/shipment-text";
 
-type TransferRequestRow = {
-  id: string;
-  source_store_id: string;
-  destination_store_id: string;
-  product_id: string;
-  quantity: number;
-  status: string;
-  shipment_id: string | null;
-};
-
 type ShipmentRow = Shipment;
 
 type ShipmentItemRow = ShipmentItem;
@@ -113,50 +103,37 @@ export class ShipmentsService {
       throw new ForbiddenError(SHIPMENT_TEXT.error.forbidden_create);
     }
 
-    const transferRequests = (await sql`
-    SELECT
-      id,
-      source_store_id,
-      destination_store_id,
-      product_id,
-      quantity,
-      status,
-      shipment_id
-    FROM transfer_requests
-    WHERE id = ${data.transfer_request_id}
-    LIMIT 1
-  `) as TransferRequestRow[];
-
-    if (!transferRequests.length) {
-      throw new NotFoundError(SHIPMENT_TEXT.error.transfer_request_not_found);
-    }
-
-    const transferRequest = transferRequests[0];
-
-    if (transferRequest.shipment_id) {
-      throw new ValidationError(SHIPMENT_TEXT.error.shipment_already_exists);
-    }
-
-    if (
-      transferRequest.status !== "pending" &&
-      transferRequest.status !== "approved"
-    ) {
-      throw new ValidationError(SHIPMENT_TEXT.error.invalid_transfer_request);
-    }
-
     const shipmentId = crypto.randomUUID();
-    const shipmentNumber = `SHP-${Date.now()}`;
+    const shipmentNumber = `SHP-${crypto
+      .randomUUID()
+      .slice(0, 8)
+      .toUpperCase()}`;
 
     const rows = (await sql`
-    WITH reserved_inventory AS (
-      UPDATE inventory
+    WITH locked_request AS MATERIALIZED (
+      SELECT
+        id,
+        source_store_id,
+        destination_store_id,
+        product_id,
+        quantity
+      FROM transfer_requests
+      WHERE id = ${data.transfer_request_id}
+        AND shipment_id IS NULL
+        AND status IN ('pending', 'approved')
+      FOR UPDATE
+    ),
+
+    reserved_inventory AS (
+      UPDATE inventory i
       SET
-        reserved_quantity =
-          reserved_quantity + ${transferRequest.quantity}
-      WHERE store_id = ${transferRequest.source_store_id}
-        AND product_id = ${transferRequest.product_id}
-        AND quantity - reserved_quantity >= ${transferRequest.quantity}
-      RETURNING store_id, product_id
+        reserved_quantity = i.reserved_quantity + tr.quantity,
+        updated_at = NOW()
+      FROM locked_request tr
+      WHERE i.store_id = tr.source_store_id
+        AND i.product_id = tr.product_id
+        AND i.quantity - i.reserved_quantity >= tr.quantity
+      RETURNING i.store_id, i.product_id
     ),
 
     created_shipment AS (
@@ -172,12 +149,15 @@ export class ShipmentsService {
       SELECT
         ${shipmentId},
         ${shipmentNumber},
-        ${transferRequest.source_store_id},
-        ${transferRequest.destination_store_id},
+        tr.source_store_id,
+        tr.destination_store_id,
         'pending',
         ${currentUser.id},
         ${currentUser.id}
-      FROM reserved_inventory
+      FROM locked_request tr
+      JOIN reserved_inventory ri
+        ON ri.store_id = tr.source_store_id
+        AND ri.product_id = tr.product_id
       RETURNING
         id,
         shipment_number,
@@ -198,37 +178,57 @@ export class ShipmentsService {
         quantity
       )
       SELECT
-        ${shipmentId},
-        ${transferRequest.product_id},
-        ${transferRequest.quantity}
-      FROM created_shipment
+        cs.id,
+        tr.product_id,
+        tr.quantity
+      FROM created_shipment cs
+      JOIN locked_request tr ON TRUE
+      RETURNING id
+    ),
+
+    updated_transfer_request AS (
+      UPDATE transfer_requests tr
+      SET
+        shipment_id = cs.id,
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      FROM created_shipment cs
+      WHERE tr.id = ${data.transfer_request_id}
+        AND tr.shipment_id IS NULL
+        AND tr.status IN ('pending', 'approved')
+      RETURNING tr.id
     )
 
-    UPDATE transfer_requests
-    SET
-      shipment_id = ${shipmentId},
-      updated_by = ${currentUser.id},
-      updated_at = NOW()
-    WHERE id = ${transferRequest.id}
-      AND EXISTS (
-        SELECT 1
-        FROM created_shipment
-      )
+    SELECT cs.*
+    FROM created_shipment cs
+    JOIN updated_transfer_request utr ON TRUE
+    WHERE EXISTS (SELECT 1 FROM created_item)
+  `) as Shipment[];
 
-    RETURNING
-      ${shipmentId} AS id,
-      ${shipmentNumber} AS shipment_number,
-      ${transferRequest.source_store_id} AS source_store_id,
-      ${transferRequest.destination_store_id} AS destination_store_id,
-      'pending' AS status,
-      ${currentUser.id} AS created_by,
-      ${currentUser.id} AS updated_by,
-      NOW() AS created_at,
-      NOW() AS updated_at,
-      NULL::timestamp AS completed_at
-  `) as ShipmentRow[];
+    if (rows.length === 0) {
+      const requests = (await sql`
+      SELECT id, shipment_id, status
+      FROM transfer_requests
+      WHERE id = ${data.transfer_request_id}
+      LIMIT 1
+    `) as {
+        id: string;
+        shipment_id: string | null;
+        status: string;
+      }[];
 
-    if (!rows.length) {
+      if (!requests.length) {
+        throw new NotFoundError(SHIPMENT_TEXT.error.transfer_request_not_found);
+      }
+
+      if (requests[0].shipment_id) {
+        throw new ValidationError(SHIPMENT_TEXT.error.shipment_already_exists);
+      }
+
+      if (!["pending", "approved"].includes(requests[0].status)) {
+        throw new ValidationError(SHIPMENT_TEXT.error.invalid_transfer_request);
+      }
+
       throw new ValidationError(SHIPMENT_TEXT.error.insufficient_inventory);
     }
 
@@ -299,46 +299,91 @@ export class ShipmentsService {
     currentUser: CurrentUser,
   ): Promise<Shipment> {
     const rows = (await sql`
-    WITH shipment_data AS (
+    WITH locked_shipment AS MATERIALIZED (
+      SELECT
+        id,
+        source_store_id,
+        destination_store_id
+      FROM shipments
+      WHERE id = ${shipment.id}
+        AND status = 'in_transit'
+      FOR UPDATE
+    ),
+
+    locked_request AS MATERIALIZED (
+      SELECT tr.id, tr.shipment_id
+      FROM transfer_requests tr
+      JOIN locked_shipment ls
+        ON ls.id = tr.shipment_id
+      WHERE tr.status IN ('pending', 'approved')
+      FOR UPDATE OF tr
+    ),
+
+    shipment_data AS MATERIALIZED (
       SELECT
         si.id AS shipment_item_id,
         si.product_id,
         si.quantity
       FROM shipment_items si
-      WHERE si.shipment_id = ${shipment.id}
+      JOIN locked_shipment ls
+        ON ls.id = si.shipment_id
+    ),
+
+    locked_source_inventory AS MATERIALIZED (
+      SELECT
+        i.id,
+        i.product_id,
+        i.quantity,
+        i.reserved_quantity,
+        sd.quantity AS shipment_quantity,
+        sd.shipment_item_id
+      FROM inventory i
+      JOIN shipment_data sd
+        ON sd.product_id = i.product_id
+      CROSS JOIN locked_shipment ls
+      CROSS JOIN locked_request lr
+      WHERE i.store_id = ls.source_store_id
+        AND i.quantity >= sd.quantity
+        AND i.reserved_quantity >= sd.quantity
+      FOR UPDATE OF i
+    ),
+
+    valid_source AS MATERIALIZED (
+      SELECT 1
+      WHERE EXISTS (SELECT 1 FROM locked_request)
+        AND (SELECT COUNT(*) FROM shipment_data) > 0
+        AND (
+          SELECT COUNT(*) FROM locked_source_inventory
+        ) = (
+          SELECT COUNT(*) FROM shipment_data
+        )
     ),
 
     source_inventory AS (
       UPDATE inventory i
       SET
-        quantity = i.quantity - sd.quantity,
+        quantity = i.quantity - si.shipment_quantity,
         reserved_quantity =
-          i.reserved_quantity - sd.quantity
-      FROM shipment_data sd
-      WHERE i.store_id = ${shipment.source_store_id}
-        AND i.product_id = sd.product_id
-        AND i.quantity >= sd.quantity
-        AND i.reserved_quantity >= sd.quantity
+          i.reserved_quantity - si.shipment_quantity,
+        updated_at = NOW()
+      FROM locked_source_inventory si
+      CROSS JOIN valid_source vs
+      WHERE i.id = si.id
       RETURNING
         i.product_id,
-        i.quantity + sd.quantity AS quantity_before,
+        i.quantity + si.shipment_quantity AS quantity_before,
         i.quantity AS quantity_after,
-        sd.quantity,
-        sd.shipment_item_id
+        si.shipment_quantity AS quantity,
+        si.shipment_item_id
     ),
 
-    valid_source AS (
+    valid_source_after AS MATERIALIZED (
       SELECT 1
-      WHERE
-        (SELECT COUNT(*) FROM shipment_data) > 0
-        AND
-        (
-          SELECT COUNT(*)
-          FROM source_inventory
-        ) = (
-          SELECT COUNT(*)
-          FROM shipment_data
-        )
+      WHERE (
+        SELECT COUNT(*) FROM source_inventory
+      ) = (
+        SELECT COUNT(*) FROM shipment_data
+      )
     ),
 
     transfer_out_movements AS (
@@ -354,29 +399,28 @@ export class ShipmentsService {
         created_by
       )
       SELECT
-        ${shipment.source_store_id},
+        ls.source_store_id,
         si.product_id,
         -si.quantity,
         si.quantity_before,
         si.quantity_after,
         'transfer_out',
-        ${shipment.id},
+        ls.id,
         si.shipment_item_id,
         ${currentUser.id}
       FROM source_inventory si
-      CROSS JOIN valid_source
+      CROSS JOIN locked_shipment ls
+      CROSS JOIN valid_source_after
       RETURNING id
     ),
 
-    destination_before AS (
-      SELECT
-        i.product_id,
-        i.quantity AS quantity_before
-      FROM inventory i
-      JOIN shipment_data sd
-        ON sd.product_id = i.product_id
-      CROSS JOIN valid_source
-      WHERE i.store_id = ${shipment.destination_store_id}
+    valid_transfer_out AS MATERIALIZED (
+      SELECT 1
+      WHERE (
+        SELECT COUNT(*) FROM transfer_out_movements
+      ) = (
+        SELECT COUNT(*) FROM shipment_data
+      )
     ),
 
     destination_inventory AS (
@@ -387,20 +431,27 @@ export class ShipmentsService {
         reserved_quantity
       )
       SELECT
-        ${shipment.destination_store_id},
+        ls.destination_store_id,
         sd.product_id,
         sd.quantity,
         0
       FROM shipment_data sd
-      CROSS JOIN valid_source
+      CROSS JOIN locked_shipment ls
+      CROSS JOIN valid_transfer_out
       ON CONFLICT (store_id, product_id)
-      DO UPDATE
-      SET
-        quantity =
-          inventory.quantity + EXCLUDED.quantity
-      RETURNING
-        product_id,
-        quantity
+      DO UPDATE SET
+        quantity = inventory.quantity + EXCLUDED.quantity,
+        updated_at = NOW()
+      RETURNING product_id, quantity
+    ),
+
+    valid_destination AS MATERIALIZED (
+      SELECT 1
+      WHERE (
+        SELECT COUNT(*) FROM destination_inventory
+      ) = (
+        SELECT COUNT(*) FROM shipment_data
+      )
     ),
 
     transfer_in_movements AS (
@@ -416,62 +467,73 @@ export class ShipmentsService {
         created_by
       )
       SELECT
-        ${shipment.destination_store_id},
+        ls.destination_store_id,
         di.product_id,
         sd.quantity,
-        COALESCE(db.quantity_before, 0),
+        di.quantity - sd.quantity,
         di.quantity,
         'transfer_in',
-        ${shipment.id},
+        ls.id,
         sd.shipment_item_id,
         ${currentUser.id}
       FROM destination_inventory di
       JOIN shipment_data sd
         ON sd.product_id = di.product_id
-      LEFT JOIN destination_before db
-        ON db.product_id = di.product_id
-      CROSS JOIN valid_source
+      CROSS JOIN locked_shipment ls
+      CROSS JOIN valid_destination
       RETURNING id
     ),
 
-   updated_transfer_request AS (
-      UPDATE transfer_requests
+    valid_transfer_in AS MATERIALIZED (
+      SELECT 1
+      WHERE (
+        SELECT COUNT(*) FROM transfer_in_movements
+      ) = (
+        SELECT COUNT(*) FROM shipment_data
+      )
+    ),
+
+    updated_transfer_request AS (
+      UPDATE transfer_requests tr
       SET
         status = 'fulfilled',
         updated_by = ${currentUser.id},
         updated_at = NOW()
-      WHERE shipment_id = ${shipment.id}
-        AND status IN ('pending', 'approved')
-        AND EXISTS (
-          SELECT 1
-          FROM valid_source
-        )
-      RETURNING id
+      FROM locked_request lr
+      CROSS JOIN valid_transfer_in
+      WHERE tr.id = lr.id
+        AND tr.shipment_id = ${shipment.id}
+        AND tr.status IN ('pending', 'approved')
+      RETURNING tr.id
+    ),
+
+    updated_shipment AS (
+      UPDATE shipments s
+      SET
+        status = 'completed',
+        completed_at = NOW(),
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      FROM locked_shipment ls
+      CROSS JOIN updated_transfer_request
+      WHERE s.id = ls.id
+        AND s.status = 'in_transit'
+      RETURNING
+        s.id,
+        s.shipment_number,
+        s.source_store_id,
+        s.destination_store_id,
+        s.status,
+        s.created_by,
+        s.updated_by,
+        s.created_at,
+        s.updated_at,
+        s.completed_at
     )
 
-    UPDATE shipments
-    SET
-      status = 'completed',
-      completed_at = NOW(),
-      updated_by = ${currentUser.id},
-      updated_at = NOW()
-    WHERE id = ${shipment.id}
-      AND EXISTS (
-        SELECT 1
-        FROM updated_transfer_request
-      )
-    RETURNING
-      id,
-      shipment_number,
-      source_store_id,
-      destination_store_id,
-      status,
-      created_by,
-      updated_by,
-      created_at,
-      updated_at,
-      completed_at
-  `) as ShipmentRow[];
+    SELECT *
+    FROM updated_shipment
+  `) as Shipment[];
 
     if (!rows.length) {
       throw new ValidationError(
@@ -487,68 +549,123 @@ export class ShipmentsService {
     currentUser: CurrentUser,
   ): Promise<Shipment> {
     const rows = (await sql`
-    WITH shipment_data AS (
+    WITH locked_shipment AS MATERIALIZED (
+      SELECT
+        id,
+        source_store_id
+      FROM shipments
+      WHERE id = ${shipment.id}
+        AND status = 'pending'
+      FOR UPDATE
+    ),
+
+    locked_request AS MATERIALIZED (
+      SELECT tr.id, tr.shipment_id
+      FROM transfer_requests tr
+      JOIN locked_shipment ls
+        ON ls.id = tr.shipment_id
+      WHERE tr.status IN ('pending', 'approved')
+      FOR UPDATE OF tr
+    ),
+
+    shipment_data AS MATERIALIZED (
       SELECT
         si.id AS shipment_item_id,
         si.product_id,
         si.quantity
       FROM shipment_items si
-      WHERE si.shipment_id = ${shipment.id}
+      JOIN locked_shipment ls
+        ON ls.id = si.shipment_id
+    ),
+
+    locked_inventory AS MATERIALIZED (
+      SELECT
+        i.id,
+        i.reserved_quantity,
+        sd.quantity AS shipment_quantity
+      FROM inventory i
+      JOIN shipment_data sd
+        ON sd.product_id = i.product_id
+      CROSS JOIN locked_shipment ls
+      CROSS JOIN locked_request lr
+      WHERE i.store_id = ls.source_store_id
+        AND i.reserved_quantity >= sd.quantity
+      FOR UPDATE OF i
+    ),
+
+    valid_inventory AS MATERIALIZED (
+      SELECT 1
+      WHERE EXISTS (SELECT 1 FROM locked_request)
+        AND (SELECT COUNT(*) FROM shipment_data) > 0
+        AND (
+          SELECT COUNT(*) FROM locked_inventory
+        ) = (
+          SELECT COUNT(*) FROM shipment_data
+        )
     ),
 
     released_inventory AS (
       UPDATE inventory i
       SET
         reserved_quantity =
-          i.reserved_quantity - sd.quantity
-      FROM shipment_data sd
-      WHERE i.store_id = ${shipment.source_store_id}
-        AND i.product_id = sd.product_id
-        AND i.reserved_quantity >= sd.quantity
-      RETURNING
-        i.product_id,
-        i.reserved_quantity + sd.quantity AS reserved_before,
-        i.reserved_quantity AS reserved_after,
-        sd.quantity,
-        sd.shipment_item_id
+          i.reserved_quantity - li.shipment_quantity,
+        updated_at = NOW()
+      FROM locked_inventory li
+      CROSS JOIN valid_inventory vi
+      WHERE i.id = li.id
+      RETURNING i.id
     ),
 
-    valid_inventory AS (
+    valid_release AS MATERIALIZED (
       SELECT 1
-      WHERE
-        (SELECT COUNT(*) FROM shipment_data) > 0
-        AND
-        (
-          SELECT COUNT(*)
-          FROM released_inventory
-        ) = (
-          SELECT COUNT(*)
-          FROM shipment_data
-        )
+      WHERE (
+        SELECT COUNT(*) FROM released_inventory
+      ) = (
+        SELECT COUNT(*) FROM shipment_data
+      )
+    ),
+
+    updated_transfer_request AS (
+      UPDATE transfer_requests tr
+      SET
+        status = 'cancelled',
+        cancelled_at = NOW(),
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      FROM locked_request lr
+      CROSS JOIN valid_release
+      WHERE tr.id = lr.id
+        AND tr.shipment_id = ${shipment.id}
+        AND tr.status IN ('pending', 'approved')
+      RETURNING tr.id
+    ),
+
+    updated_shipment AS (
+      UPDATE shipments s
+      SET
+        status = 'cancelled',
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      FROM locked_shipment ls
+      CROSS JOIN updated_transfer_request
+      WHERE s.id = ls.id
+        AND s.status = 'pending'
+      RETURNING
+        s.id,
+        s.shipment_number,
+        s.source_store_id,
+        s.destination_store_id,
+        s.status,
+        s.created_by,
+        s.updated_by,
+        s.created_at,
+        s.updated_at,
+        s.completed_at
     )
 
-    UPDATE shipments
-    SET
-      status = 'cancelled',
-      updated_by = ${currentUser.id},
-      updated_at = NOW()
-    WHERE id = ${shipment.id}
-      AND EXISTS (
-        SELECT 1
-        FROM valid_inventory
-      )
-    RETURNING
-      id,
-      shipment_number,
-      source_store_id,
-      destination_store_id,
-      status,
-      created_by,
-      updated_by,
-      created_at,
-      updated_at,
-      completed_at
-  `) as ShipmentRow[];
+    SELECT *
+    FROM updated_shipment
+  `) as Shipment[];
 
     if (!rows.length) {
       throw new ValidationError(
