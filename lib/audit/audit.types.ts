@@ -30,6 +30,7 @@ export type AuditAction =
   //TRANSFER_REQUEST
   | "transfer_request:create"
   | "transfer_request:update"
+  | "transfer_request:cancel"
 
   //TRIP
   | "trip:create"

@@ -33,20 +33,28 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const { id } = await params;
 
     const body: unknown = await request.json();
-
     const data = validate(updateTransferRequestSchema, body);
 
-    const transferRequest = await TransferRequestsService.updateTransferRequest(
-      id,
-      data,
-      currentUser,
-    );
+    const transferRequest =
+      await TransferRequestsService.updateTransferRequest(
+        id,
+        data,
+        currentUser,
+      );
+
+    const action =
+      data.status === "cancelled"
+        ? "transfer_request:cancel"
+        : "transfer_request:update";
 
     await AuditService.log({
       userId: currentUser.id,
-      action: "transfer_request:update",
+      action,
       entity: "transfer_request",
       entityId: transferRequest.id,
+      meta: {
+        status: transferRequest.status,
+      },
     });
 
     return NextResponse.json(transferRequest);
