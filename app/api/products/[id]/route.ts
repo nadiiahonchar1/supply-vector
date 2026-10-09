@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
+import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors/handle-api-error";
 import { validate } from "@/lib/validation/validate";
-
-import { ProductsService } from "@/lib/products/products.service";
+import { ProductsService } from "@/lib/products";
 import { updateProductSchema } from "@/features/products/validation/product.schema";
 
 type Params = {
