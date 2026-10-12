@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { createProductSchema } from "@/features/products";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
-import { validate } from "@/lib/validation/validate";
+import { validate } from "@/lib/validation";
 import { ProductsService } from "@/lib/products";
-import { createProductSchema } from "@/features/products/validation/product.schema";
 
 export async function GET() {
   try {

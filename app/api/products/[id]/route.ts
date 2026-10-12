@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { updateProductSchema } from "@/features/products";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
-import { validate } from "@/lib/validation/validate";
+import { validate } from "@/lib/validation";
 import { ProductsService } from "@/lib/products";
-import { updateProductSchema } from "@/features/products/validation/product.schema";
 
 type Params = {
   params: Promise<{ id: string }>;
