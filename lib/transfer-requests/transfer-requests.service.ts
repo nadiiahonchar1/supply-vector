@@ -188,6 +188,12 @@ export const TransferRequestsService = {
     if (!hasPermission(currentUser.role, requiredPermission)) {
       throw new ForbiddenError(forbiddenMessage);
     }
+   
+    if (isCancelling && existingRequest.shipment_id) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.shipment_already_exists,
+      );
+    }
 
     const nextStatus = data.status ?? existingRequest.status;
 
