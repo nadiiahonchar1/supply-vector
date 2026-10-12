@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createInventorySchema } from "@/features/inventory";
 import { InventoryService } from "@/lib/inventory";
 import { AuditService } from "@/lib/audit";
 import { validate } from "@/lib/validation";
-import { createInventorySchema } from "@/features/inventory/validation/inventory.schema";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
 

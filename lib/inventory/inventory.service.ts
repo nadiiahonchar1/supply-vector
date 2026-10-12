@@ -1,15 +1,15 @@
 import { sql } from "@/db";
+import { INVENTORY_TEXT } from "@/features/inventory";
+import { PERMISSIONS, hasPermission } from "@/lib/auth";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { CurrentUser } from "@/features/auth";
-import {
+import type {
   AdjustInventoryInput,
   CreateInventoryInput,
   Inventory,
   InventoryWithDetails,
   UpdateInventoryInput,
-} from "@/features/inventory/types";
-import { INVENTORY_TEXT } from "@/features/inventory/constants/inventory-text";
-import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
-import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+} from "@/features/inventory";
 
 export class InventoryService {
   static async getInventory(
