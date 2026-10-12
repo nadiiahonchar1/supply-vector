@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { sql } from "@/db";
-import { getSessionFromCookie } from "./session";
-import type { CurrentUser } from "@/features/auth/types";
+import { getSessionFromCookie } from "@/lib/auth/server";
+import type { CurrentUser } from "@/features/auth";
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await getSessionFromCookie();
