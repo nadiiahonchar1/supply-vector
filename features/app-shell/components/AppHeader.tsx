@@ -2,7 +2,7 @@
 
 import { SidebarTrigger } from "@/components/ui";
 import { UserMenu } from "./UserMenu";
-import { APP_SHELL_TEXT } from "../constants/app-shell-text";
+import { APP_SHELL_TEXT } from "@/features/app-shell";
 
 export function AppHeader() {
   return (

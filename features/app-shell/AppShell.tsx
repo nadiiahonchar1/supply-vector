@@ -2,10 +2,8 @@
 
 import { usePathname } from "next/navigation";
 
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-
-import { AppHeader } from "./components/AppHeader";
-import { AppSidebar } from "./components/AppSidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui";
+import { AppHeader, AppSidebar } from "@/features/app-shell";
 
 type AppShellProps = {
   children: React.ReactNode;

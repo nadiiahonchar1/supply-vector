@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-import type { Permission } from "@/features/auth/types";
+import type { Permission } from "@/features/auth";
 
 export type NavigationItem = {
   title: string;

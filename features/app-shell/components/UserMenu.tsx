@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui";
-import { APP_SHELL_TEXT } from "../constants/app-shell-text";
+import { APP_SHELL_TEXT } from "@/features/app-shell";
 
 export function UserMenu() {
   const { user } = useAuth();
