@@ -333,10 +333,7 @@ export class InventoryService {
 
     if (result.length === 0) {
       const inventoryResult = await sql`
-        SELECT
-          id,
-          quantity,
-          max_stock
+        SELECT id, quantity, reserved_quantity, max_stock
         FROM inventory
         WHERE id = ${id}
         LIMIT 1
@@ -349,14 +346,15 @@ export class InventoryService {
       const inventory = inventoryResult[0] as {
         id: string;
         quantity: number;
+        reserved_quantity: number;
         max_stock: number | null;
       };
 
       if (
         data.quantity_change < 0 &&
-        inventory.quantity + data.quantity_change < 0
+        inventory.quantity + data.quantity_change < inventory.reserved_quantity
       ) {
-        throw new ValidationError(INVENTORY_TEXT.error.insufficient_quantity);
+        throw new ValidationError(INVENTORY_TEXT.error.below_reserved_quantity);
       }
 
       if (
