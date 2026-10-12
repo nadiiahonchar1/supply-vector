@@ -268,27 +268,28 @@ export class ShipmentsService {
     }
 
     const rows = (await sql`
-    UPDATE shipments
-    SET
-      status = ${data.status},
-      updated_by = ${currentUser.id},
-      updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING
-      id,
-      shipment_number,
-      source_store_id,
-      destination_store_id,
-      status,
-      created_by,
-      updated_by,
-      created_at,
-      updated_at,
-      completed_at
-  `) as ShipmentRow[];
+      UPDATE shipments
+      SET
+        status = ${data.status},
+        updated_by = ${currentUser.id},
+        updated_at = NOW()
+      WHERE id = ${id}
+        AND status = ${shipment.status}
+      RETURNING
+        id,
+        shipment_number,
+        source_store_id,
+        destination_store_id,
+        status,
+        created_by,
+        updated_by,
+        created_at,
+        updated_at,
+        completed_at
+    `) as ShipmentRow[];
 
     if (!rows.length) {
-      throw new NotFoundError(SHIPMENT_TEXT.error.empty_shipment);
+      throw new ValidationError(SHIPMENT_TEXT.error.invalid_status_transition);
     }
 
     return rows[0];
