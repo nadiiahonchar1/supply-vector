@@ -350,9 +350,15 @@ export class InventoryService {
         max_stock: number | null;
       };
 
+      const nextQuantity = inventory.quantity + data.quantity_change;
+
+      if (data.quantity_change < 0 && nextQuantity < 0) {
+        throw new ValidationError(INVENTORY_TEXT.error.insufficient_quantity);
+      }
+
       if (
         data.quantity_change < 0 &&
-        inventory.quantity + data.quantity_change < inventory.reserved_quantity
+        nextQuantity < inventory.reserved_quantity
       ) {
         throw new ValidationError(INVENTORY_TEXT.error.below_reserved_quantity);
       }
