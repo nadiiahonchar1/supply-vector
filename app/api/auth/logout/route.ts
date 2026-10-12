@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { logoutUser, requireUser } from "@/lib/auth/auth-service";
+import { logoutUser, requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 

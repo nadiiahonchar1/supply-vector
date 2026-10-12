@@ -4,8 +4,8 @@ import { InventoryService } from "@/lib/inventory";
 import { AuditService } from "@/lib/audit";
 import { validate } from "@/lib/validation";
 import { adjustInventorySchema } from "@/features/inventory/validation/inventory.schema";
-import { requireUser } from "@/lib/auth/auth-service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { requireUser } from "@/lib/auth/server";
+import { handleApiError } from "@/lib/errors";
 
 type RouteContext = {
   params: Promise<{

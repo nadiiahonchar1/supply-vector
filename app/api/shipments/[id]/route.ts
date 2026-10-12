@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
+import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation/validate";
 import { ShipmentsService } from "@/lib/shipments";
 import { updateShipmentSchema } from "@/features/shipments/validation/shipment.schema";
@@ -28,11 +28,9 @@ export async function GET(_request: Request, { params }: Params) {
 export async function PATCH(request: Request, { params }: Params) {
   try {
     const currentUser = await requireUser();
-
     const { id } = await params;
 
-    const body = await request.json();
-
+    const body: unknown = await request.json();
     const input = validate(updateShipmentSchema, body);
 
     const shipment = await ShipmentsService.updateShipment(
@@ -41,9 +39,16 @@ export async function PATCH(request: Request, { params }: Params) {
       currentUser,
     );
 
+    const action =
+      shipment.status === "completed"
+        ? "shipment:complete"
+        : shipment.status === "cancelled"
+          ? "shipment:cancel"
+          : "shipment:update";
+
     await AuditService.log({
       userId: currentUser.id,
-      action: "shipment:update",
+      action,
       entity: "shipment",
       entityId: shipment.id,
       meta: {

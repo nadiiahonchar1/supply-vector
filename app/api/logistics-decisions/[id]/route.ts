@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { requireUser } from "@/lib/auth/server";
+import { handleApiError } from "@/lib/errors";
 import { LogisticsDecisionsService } from "@/lib/logistics-decisions";
 
 type RouteContext = {

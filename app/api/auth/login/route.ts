@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { loginUser } from "@/lib/auth/auth-service";
+import { loginUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 

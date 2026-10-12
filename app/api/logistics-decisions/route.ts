@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createLogisticsDecisionSchema } from "@/features/logistics-decisions/validation/logistics-decision.schema";
 import { AuditService } from "@/lib/audit";
-import { requireUser } from "@/lib/auth/auth-service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { requireUser } from "@/lib/auth/server";
+import { handleApiError } from "@/lib/errors";
 import { LogisticsDecisionsService } from "@/lib/logistics-decisions";
 import { validate } from "@/lib/validation";
 

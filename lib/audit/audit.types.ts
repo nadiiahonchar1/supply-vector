@@ -26,6 +26,8 @@ export type AuditAction =
   //SHIPMENTS
   | "shipment:create"
   | "shipment:update"
+  | "shipment:cancel"
+  | "shipment:complete"
 
   //TRANSFER_REQUEST
   | "transfer_request:create"

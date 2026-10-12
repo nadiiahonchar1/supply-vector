@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
+import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation/validate";
 import { ShipmentsService } from "@/lib/shipments";
 import { createShipmentSchema } from "@/features/shipments/validation/shipment.schema";
