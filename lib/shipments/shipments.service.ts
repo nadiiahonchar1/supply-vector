@@ -132,7 +132,7 @@ export class ShipmentsService {
       FROM locked_request tr
       WHERE i.store_id = tr.source_store_id
         AND i.product_id = tr.product_id
-        AND i.quantity - i.reserved_quantity >= tr.quantity
+        AND i.quantity - i.reserved_quantity - i.min_stock >= tr.quantity
       RETURNING i.store_id, i.product_id
     ),
 
