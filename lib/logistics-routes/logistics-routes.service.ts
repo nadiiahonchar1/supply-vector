@@ -1,12 +1,12 @@
 import { sql } from "@/db";
 import type { CurrentUser } from "@/features/auth";
-import { LOGISTICS_ROUTE_TEXT } from "@/features/logistics-routes/constants/logistics-route-text";
+import { LOGISTICS_ROUTE_TEXT } from "@/features/logistics-routes";
 import type {
   CreateLogisticsRouteInput,
   LogisticsRoute,
   UpdateLogisticsRouteInput,
 } from "@/features/logistics-routes/types";
-import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
 type LogisticsRouteRow = LogisticsRoute;

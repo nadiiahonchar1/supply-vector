@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createLogisticsRouteSchema } from "@/features/logistics-routes/validation/logistics-route.schema";
+import { createLogisticsRouteSchema } from "@/features/logistics-routes";
 import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
