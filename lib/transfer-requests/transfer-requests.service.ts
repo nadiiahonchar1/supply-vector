@@ -1,10 +1,6 @@
 import { sql } from "@/db";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import {
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from "@/lib/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTransferRequestInput,
@@ -17,12 +13,8 @@ export const TransferRequestsService = {
   async getTransferRequests(
     currentUser: CurrentUser,
   ): Promise<TransferRequest[]> {
-    if (
-      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)
-    ) {
-      throw new ForbiddenError(
-        TRANSFER_REQUEST_TEXT.error.forbidden_view,
-      );
+    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const requests = await sql`
@@ -38,12 +30,8 @@ export const TransferRequestsService = {
     id: string,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    if (
-      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)
-    ) {
-      throw new ForbiddenError(
-        TRANSFER_REQUEST_TEXT.error.forbidden_view,
-      );
+    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
     }
 
     const [request] = await sql`
@@ -55,7 +43,7 @@ export const TransferRequestsService = {
 
     if (!request) {
       throw new NotFoundError(
-        TRANSFER_REQUEST_TEXT.error.not_found,
+        TRANSFER_REQUEST_TEXT.error.empty_transfer_request,
       );
     }
 
@@ -66,24 +54,15 @@ export const TransferRequestsService = {
     data: CreateTransferRequestInput,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    if (
-      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CREATE)
-    ) {
-      throw new ForbiddenError(
-        TRANSFER_REQUEST_TEXT.error.forbidden_create,
-      );
+    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CREATE)) {
+      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_create);
     }
 
     if (data.source_store_id === data.destination_store_id) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.same_source_and_destination,
-      );
+      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.same_stores);
     }
 
-    this.validateDeliveryWindow(
-      data.earliest_delivery,
-      data.latest_delivery,
-    );
+    this.validateDeliveryWindow(data.earliest_delivery, data.latest_delivery);
 
     // Перевіряємо, що склад-відправник існує, активний
     // і може використовуватися як вузол зберігання.
@@ -139,15 +118,11 @@ export const TransferRequestsService = {
     `;
 
     if (!product) {
-      throw new NotFoundError(
-        TRANSFER_REQUEST_TEXT.error.product_not_found,
-      );
+      throw new NotFoundError(TRANSFER_REQUEST_TEXT.error.product_not_found);
     }
 
     if (!product.is_active) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.product_inactive,
-      );
+      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.product_inactive);
     }
 
     // Важливо: тут навмисно НЕ перевіряємо inventory.
@@ -174,8 +149,8 @@ export const TransferRequestsService = {
         ${data.quantity},
         ${data.priority},
         'pending',
-        ${data.earliest_delivery},
-        ${data.latest_delivery},
+        ${data.earliest_delivery ?? null},
+        ${data.latest_delivery ?? null},
         ${currentUser.id},
         ${currentUser.id}
       )
@@ -194,10 +169,7 @@ export const TransferRequestsService = {
     data: UpdateTransferRequestInput,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    const existingRequest = await this.getTransferRequestById(
-      id,
-      currentUser,
-    );
+    const existingRequest = await this.getTransferRequestById(id, currentUser);
 
     const isCancelling = data.status === "cancelled";
 
@@ -216,10 +188,7 @@ export const TransferRequestsService = {
     const nextStatus = data.status ?? existingRequest.status;
 
     if (nextStatus !== existingRequest.status) {
-      this.validateStatusTransition(
-        existingRequest.status,
-        nextStatus,
-      );
+      this.validateStatusTransition(existingRequest.status, nextStatus);
     }
 
     const earliestDelivery =
@@ -232,10 +201,7 @@ export const TransferRequestsService = {
         ? data.latest_delivery
         : existingRequest.latest_delivery;
 
-    this.validateDeliveryWindow(
-      earliestDelivery,
-      latestDelivery,
-    );
+    this.validateDeliveryWindow(earliestDelivery, latestDelivery);
 
     // Схвалення заявки не означає, що товар уже доступний.
     // Доступність і резервування перевіряються під час createShipment.
@@ -258,7 +224,7 @@ export const TransferRequestsService = {
 
     if (!updatedRequest) {
       throw new NotFoundError(
-        TRANSFER_REQUEST_TEXT.error.not_found,
+        TRANSFER_REQUEST_TEXT.error.empty_transfer_request,
       );
     }
 
@@ -266,14 +232,13 @@ export const TransferRequestsService = {
   },
 
   validateDeliveryWindow(
-    earliestDelivery: string | null,
-    latestDelivery: string | null,
+    earliestDelivery: string | null | undefined,
+    latestDelivery: string | null | undefined,
   ): void {
     if (
       earliestDelivery &&
       latestDelivery &&
-      new Date(earliestDelivery).getTime() >
-        new Date(latestDelivery).getTime()
+      new Date(earliestDelivery).getTime() > new Date(latestDelivery).getTime()
     ) {
       throw new ValidationError(
         TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
