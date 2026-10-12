@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 import type { CurrentUser } from "@/features/auth/types";
-import {
+import type {
   CreateTransferRequestInput,
   TransferRequest,
   TransferRequestStatus,
