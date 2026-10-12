@@ -1,186 +1,160 @@
 import { sql } from "@/db";
-import type { CurrentUser } from "@/features/auth/types";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "@/lib/errors";
+import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTransferRequestInput,
   TransferRequest,
-  TransferRequestStatus,
   UpdateTransferRequestInput,
 } from "@/features/transfer-requests/types";
 import { TRANSFER_REQUEST_TEXT } from "@/features/transfer-requests/constants/transfer-request-text";
-import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
-type TransferRequestRow = TransferRequest;
-
-type StoreRow = {
-  id: string;
-  is_storage_node: boolean;
-};
-
-type InventoryRow = {
-  id: string;
-  quantity: number;
-  reserved_quantity: number;
-};
-
-export class TransferRequestsService {
-  static async getTransferRequests(
+export const TransferRequestsService = {
+  async getTransferRequests(
     currentUser: CurrentUser,
   ): Promise<TransferRequest[]> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
+    if (
+      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)
+    ) {
+      throw new ForbiddenError(
+        TRANSFER_REQUEST_TEXT.error.forbidden_view,
+      );
     }
 
-    const rows = (await sql`
-      SELECT
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        priority,
-        status,
-        earliest_delivery,
-        latest_delivery,
-        shipment_id,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        cancelled_at
+    const requests = await sql`
+      SELECT *
       FROM transfer_requests
       ORDER BY created_at DESC
-    `) as TransferRequestRow[];
+    `;
 
-    return rows;
-  }
+    return requests as TransferRequest[];
+  },
 
-  static async getTransferRequestById(
+  async getTransferRequestById(
     id: string,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)) {
-      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_view);
+    if (
+      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_VIEW)
+    ) {
+      throw new ForbiddenError(
+        TRANSFER_REQUEST_TEXT.error.forbidden_view,
+      );
     }
 
-    const rows = (await sql`
-      SELECT
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        priority,
-        status,
-        earliest_delivery,
-        latest_delivery,
-        shipment_id,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        cancelled_at
+    const [request] = await sql`
+      SELECT *
       FROM transfer_requests
       WHERE id = ${id}
       LIMIT 1
-    `) as TransferRequestRow[];
+    `;
 
-    if (!rows.length) {
+    if (!request) {
       throw new NotFoundError(
-        TRANSFER_REQUEST_TEXT.error.empty_transfer_request,
+        TRANSFER_REQUEST_TEXT.error.not_found,
       );
     }
 
-    return rows[0];
-  }
+    return request as TransferRequest;
+  },
 
-  static async createTransferRequest(
+  async createTransferRequest(
     data: CreateTransferRequestInput,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CREATE)) {
-      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_create);
+    if (
+      !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CREATE)
+    ) {
+      throw new ForbiddenError(
+        TRANSFER_REQUEST_TEXT.error.forbidden_create,
+      );
     }
 
     if (data.source_store_id === data.destination_store_id) {
-      throw new ValidationError(TRANSFER_REQUEST_TEXT.error.same_stores);
-    }
-
-    this.validateDeliveryWindow(data.earliest_delivery, data.latest_delivery);
-
-    const storeRows = (await sql`
-      SELECT
-        id,
-        is_storage_node
-      FROM stores
-      WHERE id IN (
-        ${data.source_store_id},
-        ${data.destination_store_id}
-      )
-        AND is_active = TRUE
-    `) as StoreRow[];
-
-    if (storeRows.length !== 2) {
-      const sourceExists = storeRows.some(
-        (store) => store.id === data.source_store_id,
-      );
-
-      throw new NotFoundError(
-        sourceExists
-          ? TRANSFER_REQUEST_TEXT.error.destination_store_not_found
-          : TRANSFER_REQUEST_TEXT.error.source_store_not_found,
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.same_source_and_destination,
       );
     }
 
-    const sourceStore = storeRows.find(
-      (store) => store.id === data.source_store_id,
+    this.validateDeliveryWindow(
+      data.earliest_delivery,
+      data.latest_delivery,
     );
 
-    if (!sourceStore?.is_storage_node) {
+    // Перевіряємо, що склад-відправник існує, активний
+    // і може використовуватися як вузол зберігання.
+    const [sourceStore] = await sql`
+      SELECT id, is_active, is_storage_node
+      FROM stores
+      WHERE id = ${data.source_store_id}
+      LIMIT 1
+    `;
+
+    if (!sourceStore) {
+      throw new NotFoundError(
+        TRANSFER_REQUEST_TEXT.error.source_store_not_found,
+      );
+    }
+
+    if (!sourceStore.is_active) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.source_store_inactive,
+      );
+    }
+
+    if (!sourceStore.is_storage_node) {
       throw new ValidationError(
         TRANSFER_REQUEST_TEXT.error.source_store_not_storage_node,
       );
     }
 
-    const productRows = await sql`
-      SELECT id
-      FROM products
-      WHERE id = ${data.product_id}
-        AND is_active = TRUE
+    const [destinationStore] = await sql`
+      SELECT id, is_active
+      FROM stores
+      WHERE id = ${data.destination_store_id}
       LIMIT 1
     `;
 
-    if (!productRows.length) {
-      throw new NotFoundError(TRANSFER_REQUEST_TEXT.error.product_not_found);
+    if (!destinationStore) {
+      throw new NotFoundError(
+        TRANSFER_REQUEST_TEXT.error.destination_store_not_found,
+      );
     }
 
-    const inventoryRows = (await sql`
-      SELECT
-        id,
-        quantity,
-        reserved_quantity
-      FROM inventory
-      WHERE store_id = ${data.source_store_id}
-        AND product_id = ${data.product_id}
+    if (!destinationStore.is_active) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.destination_store_inactive,
+      );
+    }
+
+    const [product] = await sql`
+      SELECT id, is_active
+      FROM products
+      WHERE id = ${data.product_id}
       LIMIT 1
-    `) as InventoryRow[];
+    `;
 
-    if (!inventoryRows.length) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.inventory_not_found,
+    if (!product) {
+      throw new NotFoundError(
+        TRANSFER_REQUEST_TEXT.error.product_not_found,
       );
     }
 
-    const inventory = inventoryRows[0];
-    const availableQuantity = inventory.quantity - inventory.reserved_quantity;
-
-    if (availableQuantity < data.quantity) {
+    if (!product.is_active) {
       throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.insufficient_inventory,
+        TRANSFER_REQUEST_TEXT.error.product_inactive,
       );
     }
 
-    const rows = (await sql`
+    // Важливо: тут навмисно НЕ перевіряємо inventory.
+    // Заявка може описувати майбутню потребу.
+    // Фактичну доступність товару та резервування перевіряє
+    // атомарна операція створення відправлення.
+    const [request] = await sql`
       INSERT INTO transfer_requests (
         source_store_id,
         destination_store_id,
@@ -191,9 +165,7 @@ export class TransferRequestsService {
         earliest_delivery,
         latest_delivery,
         created_by,
-        updated_by,
-        created_at,
-        updated_at
+        updated_by
       )
       VALUES (
         ${data.source_store_id},
@@ -202,197 +174,131 @@ export class TransferRequestsService {
         ${data.quantity},
         ${data.priority},
         'pending',
-        ${data.earliest_delivery ?? null},
-        ${data.latest_delivery ?? null},
+        ${data.earliest_delivery},
+        ${data.latest_delivery},
         ${currentUser.id},
-        ${currentUser.id},
-        NOW(),
-        NOW()
+        ${currentUser.id}
       )
-      RETURNING
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        priority,
-        status,
-        earliest_delivery,
-        latest_delivery,
-        shipment_id,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        cancelled_at
-    `) as TransferRequestRow[];
+      RETURNING *
+    `;
 
-    return rows[0];
-  }
+    if (!request) {
+      throw new Error("Не вдалося створити заявку на переміщення");
+    }
 
-  static async updateTransferRequest(
+    return request as TransferRequest;
+  },
+
+  async updateTransferRequest(
     id: string,
     data: UpdateTransferRequestInput,
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_UPDATE)) {
-      throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_update);
+    const existingRequest = await this.getTransferRequestById(
+      id,
+      currentUser,
+    );
+
+    const isCancelling = data.status === "cancelled";
+
+    const requiredPermission = isCancelling
+      ? PERMISSIONS.TRANSFER_REQUEST_CANCEL
+      : PERMISSIONS.TRANSFER_REQUEST_UPDATE;
+
+    const forbiddenMessage = isCancelling
+      ? TRANSFER_REQUEST_TEXT.error.forbidden_cancel
+      : TRANSFER_REQUEST_TEXT.error.forbidden_update;
+
+    if (!hasPermission(currentUser.role, requiredPermission)) {
+      throw new ForbiddenError(forbiddenMessage);
     }
 
-    const transferRequest = await this.getTransferRequestById(id, currentUser);
+    const nextStatus = data.status ?? existingRequest.status;
 
-    if (transferRequest.status === "fulfilled") {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.cannot_update_fulfilled,
+    if (nextStatus !== existingRequest.status) {
+      this.validateStatusTransition(
+        existingRequest.status,
+        nextStatus,
       );
     }
 
-    if (transferRequest.status === "cancelled") {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.cannot_update_cancelled,
-      );
-    }
-
-    const nextStatus = data.status ?? transferRequest.status;
-
-    this.validateStatusTransition(transferRequest.status, nextStatus);
-
-    if (nextStatus === "cancelled") {
-      if (
-        !hasPermission(currentUser.role, PERMISSIONS.TRANSFER_REQUEST_CANCEL)
-      ) {
-        throw new ForbiddenError(TRANSFER_REQUEST_TEXT.error.forbidden_cancel);
-      }
-    }
-
-    const nextEarliestDelivery =
+    const earliestDelivery =
       data.earliest_delivery !== undefined
         ? data.earliest_delivery
-        : transferRequest.earliest_delivery;
+        : existingRequest.earliest_delivery;
 
-    const nextLatestDelivery =
+    const latestDelivery =
       data.latest_delivery !== undefined
         ? data.latest_delivery
-        : transferRequest.latest_delivery;
+        : existingRequest.latest_delivery;
 
-    this.validateDeliveryWindow(nextEarliestDelivery, nextLatestDelivery);
+    this.validateDeliveryWindow(
+      earliestDelivery,
+      latestDelivery,
+    );
 
-    if (transferRequest.status === "pending" && nextStatus === "approved") {
-      await this.validateAvailableInventory(transferRequest);
-    }
-
-    const rows = (await sql`
+    // Схвалення заявки не означає, що товар уже доступний.
+    // Доступність і резервування перевіряються під час createShipment.
+    const [updatedRequest] = await sql`
       UPDATE transfer_requests
       SET
-        priority = COALESCE(
-          ${data.priority ?? null},
-          priority
-        ),
         status = ${nextStatus},
-        earliest_delivery = ${nextEarliestDelivery},
-        latest_delivery = ${nextLatestDelivery},
+        priority = ${data.priority ?? existingRequest.priority},
+        earliest_delivery = ${earliestDelivery},
+        latest_delivery = ${latestDelivery},
         updated_by = ${currentUser.id},
         updated_at = NOW(),
         cancelled_at = CASE
-          WHEN ${nextStatus} = 'cancelled'
-            THEN NOW()
+          WHEN ${nextStatus} = 'cancelled' THEN COALESCE(cancelled_at, NOW())
           ELSE cancelled_at
         END
       WHERE id = ${id}
-      RETURNING
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity,
-        priority,
-        status,
-        earliest_delivery,
-        latest_delivery,
-        shipment_id,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        cancelled_at
-    `) as TransferRequestRow[];
+      RETURNING *
+    `;
 
-    if (!rows.length) {
+    if (!updatedRequest) {
       throw new NotFoundError(
-        TRANSFER_REQUEST_TEXT.error.empty_transfer_request,
+        TRANSFER_REQUEST_TEXT.error.not_found,
       );
     }
 
-    return rows[0];
-  }
+    return updatedRequest as TransferRequest;
+  },
 
-  private static async validateAvailableInventory(
-    transferRequest: TransferRequest,
-  ): Promise<void> {
-    const inventoryRows = (await sql`
-      SELECT
-        id,
-        quantity,
-        reserved_quantity
-      FROM inventory
-      WHERE store_id = ${transferRequest.source_store_id}
-        AND product_id = ${transferRequest.product_id}
-      LIMIT 1
-    `) as InventoryRow[];
-
-    if (!inventoryRows.length) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.inventory_not_found,
-      );
-    }
-
-    const inventory = inventoryRows[0];
-
-    const availableQuantity = inventory.quantity - inventory.reserved_quantity;
-
-    if (availableQuantity < transferRequest.quantity) {
-      throw new ValidationError(
-        TRANSFER_REQUEST_TEXT.error.insufficient_inventory,
-      );
-    }
-  }
-
-  private static validateDeliveryWindow(
-    earliestDelivery: string | null | undefined,
-    latestDelivery: string | null | undefined,
+  validateDeliveryWindow(
+    earliestDelivery: string | null,
+    latestDelivery: string | null,
   ): void {
     if (
       earliestDelivery &&
       latestDelivery &&
-      new Date(latestDelivery) < new Date(earliestDelivery)
+      new Date(earliestDelivery).getTime() >
+        new Date(latestDelivery).getTime()
     ) {
       throw new ValidationError(
         TRANSFER_REQUEST_TEXT.error.invalid_delivery_window,
       );
     }
-  }
+  },
 
-  private static validateStatusTransition(
-    currentStatus: TransferRequestStatus,
-    nextStatus: TransferRequestStatus,
+  validateStatusTransition(
+    currentStatus: TransferRequest["status"],
+    nextStatus: TransferRequest["status"],
   ): void {
-    const transitions: Record<TransferRequestStatus, TransferRequestStatus[]> =
-      {
-        pending: ["approved", "cancelled"],
-        approved: ["cancelled"],
-        fulfilled: [],
-        cancelled: [],
-      };
+    const allowedTransitions: Record<
+      TransferRequest["status"],
+      TransferRequest["status"][]
+    > = {
+      pending: ["approved", "cancelled"],
+      approved: ["cancelled"],
+      fulfilled: [],
+      cancelled: [],
+    };
 
-    if (
-      currentStatus === nextStatus ||
-      transitions[currentStatus].includes(nextStatus)
-    ) {
-      return;
+    if (!allowedTransitions[currentStatus].includes(nextStatus)) {
+      throw new ValidationError(
+        TRANSFER_REQUEST_TEXT.error.invalid_status_transition,
+      );
     }
-
-    throw new ValidationError(
-      TRANSFER_REQUEST_TEXT.error.invalid_status_transition,
-    );
-  }
-}
+  },
+};
