@@ -64,8 +64,6 @@ export const TransferRequestsService = {
 
     this.validateDeliveryWindow(data.earliest_delivery, data.latest_delivery);
 
-    // Перевіряємо, що склад-відправник існує, активний
-    // і може використовуватися як вузол зберігання.
     const [sourceStore] = await sql`
       SELECT id, is_active, is_storage_node
       FROM stores
@@ -125,10 +123,6 @@ export const TransferRequestsService = {
       throw new ValidationError(TRANSFER_REQUEST_TEXT.error.product_inactive);
     }
 
-    // Важливо: тут навмисно НЕ перевіряємо inventory.
-    // Заявка може описувати майбутню потребу.
-    // Фактичну доступність товару та резервування перевіряє
-    // атомарна операція створення відправлення.
     const [request] = await sql`
       INSERT INTO transfer_requests (
         source_store_id,
@@ -170,6 +164,16 @@ export const TransferRequestsService = {
     currentUser: CurrentUser,
   ): Promise<TransferRequest> {
     const existingRequest = await this.getTransferRequestById(id, currentUser);
+    if (
+      existingRequest.status === "fulfilled" ||
+      existingRequest.status === "cancelled"
+    ) {
+      throw new ValidationError(
+        existingRequest.status === "fulfilled"
+          ? TRANSFER_REQUEST_TEXT.error.cannot_update_fulfilled
+          : TRANSFER_REQUEST_TEXT.error.cannot_update_cancelled,
+      );
+    }
 
     const isCancelling = data.status === "cancelled";
 
@@ -203,8 +207,6 @@ export const TransferRequestsService = {
 
     this.validateDeliveryWindow(earliestDelivery, latestDelivery);
 
-    // Схвалення заявки не означає, що товар уже доступний.
-    // Доступність і резервування перевіряються під час createShipment.
     const [updatedRequest] = await sql`
       UPDATE transfer_requests
       SET
