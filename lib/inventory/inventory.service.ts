@@ -273,7 +273,7 @@ export class InventoryService {
           quantity = quantity + ${data.quantity_change},
           updated_at = NOW()
         WHERE id = ${id}
-          AND quantity + ${data.quantity_change} >= 0
+          AND quantity + ${data.quantity_change} >= reserved_quantity
           AND (
             max_stock IS NULL
             OR quantity + ${data.quantity_change} <= max_stock
