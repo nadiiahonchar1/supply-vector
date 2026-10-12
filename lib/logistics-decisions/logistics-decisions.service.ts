@@ -1,11 +1,11 @@
 import { sql } from "@/db";
 import type { CurrentUser } from "@/features/auth";
-import { LOGISTICS_DECISION_TEXT } from "@/features/logistics-decisions/constants/logistics-decision-text";
+import { LOGISTICS_DECISION_TEXT } from "@/features/logistics-decisions";
 import type {
   CreateLogisticsDecisionInput,
   LogisticsDecision,
-} from "@/features/logistics-decisions/types";
-import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
+} from "@/features/logistics-decisions";
+import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
 type LogisticsDecisionRow = LogisticsDecision;
