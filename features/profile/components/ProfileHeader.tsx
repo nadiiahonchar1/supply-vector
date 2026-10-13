@@ -2,8 +2,7 @@
 
 import { Avatar, AvatarFallback, Badge } from "@/components/ui";
 import { getUserInitials } from "@/lib/utils";
-
-import type { Profile } from "../types";
+import type { Profile } from "@/features/profile";
 
 type ProfileHeaderProps = {
   profile: Profile;

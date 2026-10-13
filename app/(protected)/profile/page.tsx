@@ -1,6 +1,5 @@
-import { ProfilePage } from "@/features/profile/components/ProfilePage";
-
-import { ProfileService } from "@/lib/profile/profile.service";
+import { ProfilePage } from "@/features/profile";
+import { ProfileService } from "@/lib/profile";
 
 type PageProps = {
   searchParams: Promise<{ forceChange?: string }>;

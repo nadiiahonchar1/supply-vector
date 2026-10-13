@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ProfileService } from "@/lib/profile";
 import { validate } from "@/lib/validation/validate";
 import { handleApiError } from "@/lib/errors";
-import { updateProfileSchema } from "@/features/profile/validation/profile.schema";
+import { updateProfileSchema } from "@/features/profile";
 
 export async function GET() {
   try {

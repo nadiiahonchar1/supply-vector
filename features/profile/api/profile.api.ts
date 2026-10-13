@@ -1,10 +1,9 @@
 import { apiClient } from "@/lib/api-client";
-
 import type {
   Profile,
   UpdateProfileInput,
   ChangePasswordInput,
-} from "../types";
+} from "@/features/profile";
 
 export const ProfileApi = {
   getProfile() {

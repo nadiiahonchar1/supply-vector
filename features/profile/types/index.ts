@@ -13,18 +13,7 @@ export type Profile = {
   is_active: boolean;
 };
 
-export type UpdateProfileInput = {
-  first_name: string;
-  last_name: string;
-};
-
 export type ChangePasswordInput = {
   currentPassword: string;
   newPassword: string;
-};
-
-export type ChangePasswordFormValues = {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
 };

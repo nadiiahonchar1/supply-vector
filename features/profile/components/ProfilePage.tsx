@@ -5,9 +5,9 @@ import {
   ProfileInfoCard,
   ProfileForm,
   SecurityForm,
-} from "../components";
-import { PROFILE_TEXT } from "../constants/profile-text";
-import type { Profile } from "../types";
+  PROFILE_TEXT,
+} from "@/features/profile";
+import type { Profile } from "@/features/profile";
 
 type ProfilePageProps = {
   profile: Profile;

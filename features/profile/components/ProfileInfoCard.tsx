@@ -7,8 +7,8 @@ import {
   CardTitle,
   Badge,
 } from "@/components/ui";
-import { PROFILE_TEXT } from "../constants/profile-text";
-import type { Profile } from "../types";
+import { PROFILE_TEXT } from "@/features/profile";
+import type { Profile } from "@/features/profile";
 
 type ProfileInfoCardProps = {
   profile: Profile;

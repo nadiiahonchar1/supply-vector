@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-import { useChangePassword } from "../api/hooks";
-import { changePasswordFormSchema } from "../validation/password.schema";
-import type { ChangePasswordFormValues } from "../types";
-import { PROFILE_TEXT } from "../constants/profile-text";
+import {
+  useChangePassword,
+  changePasswordFormSchema,
+  PROFILE_TEXT,
+} from "@/features/profile";
+import type { ChangePasswordFormValues } from "@/features/profile";
 
 export function SecurityForm() {
   const router = useRouter();

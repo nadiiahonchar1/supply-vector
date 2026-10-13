@@ -5,12 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 import { useAuth } from "@/features/auth";
-import { useUpdateProfile } from "../api/hooks";
-import { PROFILE_TEXT } from "../constants/profile-text";
 import {
+  useUpdateProfile,
+  PROFILE_TEXT,
   updateProfileSchema,
-  type UpdateProfileInput,
-} from "../validation/profile.schema";
+} from "@/features/profile";
+import type { UpdateProfileInput } from "@/features/profile";
 
 export function ProfileForm() {
   const { user, setUser } = useAuth();

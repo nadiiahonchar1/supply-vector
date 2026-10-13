@@ -1,8 +1,7 @@
 "use client";
 
-import { ProfileApi } from "../profile.api";
-
-import type { ChangePasswordInput } from "../../types";
+import { ProfileApi } from "@/features/profile";
+import type { ChangePasswordInput } from "@/features/profile";
 
 export function useChangePassword() {
   async function changePassword(data: ChangePasswordInput) {

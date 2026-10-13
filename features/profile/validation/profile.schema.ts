@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PROFILE_TEXT } from "../constants/profile-text";
+import { PROFILE_TEXT } from "@/features/profile";
 
 export const updateProfileSchema = z.object({
   first_name: z

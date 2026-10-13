@@ -1,8 +1,7 @@
 "use client";
 
-import { ProfileApi } from "../profile.api";
-
-import type { Profile, UpdateProfileInput } from "../../types";
+import { ProfileApi } from "@/features/profile";
+import type { Profile, UpdateProfileInput } from "@/features/profile";
 
 export function useUpdateProfile() {
   async function updateProfile(data: UpdateProfileInput): Promise<Profile> {

@@ -1,13 +1,17 @@
 import { sql } from "@/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { hashPassword, verifyPassword } from "@/lib/auth/server";
-import type { CurrentUser } from "@/features/auth/types";
+
+import {
+  getCurrentUser,
+  hashPassword,
+  verifyPassword,
+} from "@/lib/auth/server";
+import type { CurrentUser } from "@/features/auth";
 import {
   UnauthorizedError,
   ValidationError,
   NotFoundError,
 } from "@/lib/errors";
-import { PROFILE_TEXT } from "@/features/profile/constants/profile-text";
+import { PROFILE_TEXT } from "@/features/profile";
 
 export type UpdateProfileDto = {
   first_name: string;
