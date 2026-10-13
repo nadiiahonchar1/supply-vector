@@ -5,7 +5,7 @@ import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation/validate";
 import { StoresService } from "@/lib/stores";
-import { updateStoreSchema } from "@/features/stores/validation/store.schema";
+import { updateStoreSchema } from "@/features/stores";
 
 type Params = {
   params: Promise<{ id: string }>;

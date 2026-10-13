@@ -3,10 +3,8 @@ import { Inter } from "next/font/google";
 
 import "./globals.css";
 
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-
-import { AppShell } from "@/features/app-shell/AppShell";
-
+import { getCurrentUser } from "@/lib/auth/server";
+import { AppShell } from "@/features/app-shell";
 import { AppProviders } from "@/providers/AppProviders";
 
 const inter = Inter({

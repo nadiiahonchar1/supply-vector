@@ -1,18 +1,15 @@
 import { sql } from "@/db";
 
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-
+import type { CurrentUser } from "@/features/auth";
+import { STORES_TEXT } from "@/features/stores";
+import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
-
-import type { CurrentUser } from "@/features/auth/types";
 
 import type {
   Store,
   CreateStoreInput,
   UpdateStoreInput,
-} from "@/features/stores/types";
-
-import { STORES_TEXT } from "@/features/stores/constants/stores-text";
+} from "@/features/stores";
 
 type StoreRow = {
   id: string;

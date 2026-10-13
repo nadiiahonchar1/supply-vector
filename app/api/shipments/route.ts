@@ -4,7 +4,7 @@ import { createShipmentSchema } from "@/features/shipments";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
-import { validate } from "@/lib/validation/validate";
+import { validate } from "@/lib/validation";
 import { ShipmentsService } from "@/lib/shipments";
 
 export async function GET() {
