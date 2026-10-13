@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { updateTransferRequestSchema } from "@/features/transfer-requests";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-import { updateTransferRequestSchema } from "@/features/transfer-requests/validation/transfer-request.schema";
 import { TransferRequestsService } from "@/lib/transfer-requests";
 
 type RouteContext = {

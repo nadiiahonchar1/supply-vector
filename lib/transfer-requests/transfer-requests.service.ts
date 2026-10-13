@@ -1,13 +1,15 @@
 import { sql } from "@/db";
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+
+import { TRANSFER_REQUEST_TEXT } from "@/features/transfer-requests";
+import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+
 import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTransferRequestInput,
   TransferRequest,
   UpdateTransferRequestInput,
-} from "@/features/transfer-requests/types";
-import { TRANSFER_REQUEST_TEXT } from "@/features/transfer-requests/constants/transfer-request-text";
+} from "@/features/transfer-requests";
 
 export const TransferRequestsService = {
   async getTransferRequests(
