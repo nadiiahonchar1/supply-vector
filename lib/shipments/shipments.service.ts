@@ -1,19 +1,17 @@
 import { sql } from "@/db";
 
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { SHIPMENT_TEXT } from "@/features/shipments";
+import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
-import type { CurrentUser } from "@/features/auth/types";
-
+import type { CurrentUser } from "@/features/auth";
 import type {
   Shipment,
   ShipmentItem,
   ShipmentStatus,
   CreateShipmentInput,
   UpdateShipmentInput,
-} from "@/features/shipments/types";
-
-import { SHIPMENT_TEXT } from "@/features/shipments/constants/shipment-text";
+} from "@/features/shipments";
 
 type ShipmentRow = Shipment;
 
