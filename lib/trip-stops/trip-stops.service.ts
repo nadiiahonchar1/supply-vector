@@ -1,13 +1,15 @@
 import { sql } from "@/db";
-import type { CurrentUser } from "@/features/auth";
-import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
+
+import { TRIP_STOP_TEXT } from "@/features/trip-stops";
+import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
-import { TRIP_STOP_TEXT } from "@/features/trip-stops/constants/trip-stop-text";
+
+import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTripStopInput,
   TripStop,
   UpdateTripStopInput,
-} from "@/features/trip-stops/types";
+} from "@/features/trip-stops";
 
 type TripStopRow = TripStop;
 
