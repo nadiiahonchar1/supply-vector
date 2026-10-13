@@ -1,16 +1,15 @@
 import { sql } from "@/db";
 
-import type { CurrentUser } from "@/features/auth/types";
+import { TRIP_ITEM_TEXT } from "@/features/trip-items";
+import { hasPermission, PERMISSIONS } from "@/lib/auth";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
+
+import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTripItemInput,
   TripItem,
   UpdateTripItemInput,
-} from "@/features/trip-items/types";
-
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
-
-import { TRIP_ITEM_TEXT } from "@/features/trip-items/constants/trip-item-text";
+} from "@/features/trip-items";
 
 type TripItemRow = TripItem;
 

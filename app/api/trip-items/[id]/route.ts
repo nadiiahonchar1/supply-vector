@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { updateTripItemSchema } from "@/features/trip-items";
+import { requireUser } from "@/lib/auth/server";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-
-import { updateTripItemSchema } from "@/features/trip-items/validation/trip-item.schema";
-import { TripItemsService } from "@/lib/trip-items/trip-items.service";
+import { TripItemsService } from "@/lib/trip-items";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
