@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
+import { updateTripSchema } from "@/features/trips";
+import { requireUser } from "@/lib/auth/server";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-import { updateTripSchema } from "@/features/trips/validation/trip.schema";
-import { TripsService } from "@/lib/trips/trips.service";
+import { TripsService } from "@/lib/trips";
 
 type RouteContext = {
   params: Promise<{
