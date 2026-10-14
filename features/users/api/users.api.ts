@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+
 import type {
   User,
   CreateUserInput,
@@ -6,7 +7,7 @@ import type {
   ChangeRoleInput,
   UpdateUserStatusInput,
   PaginatedUsersResponse,
-} from "../types";
+} from "@/features/users";
 
 export const usersApi = {
   getUsers(page = 1, limit = 20): Promise<PaginatedUsersResponse> {

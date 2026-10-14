@@ -11,13 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui";
-
 import { ROLES } from "@/lib/auth";
+import { useCreateUser, createUserSchema, USERS_TEXT } from "@/features/users";
 
-import { USERS_TEXT } from "../../constants/users-text";
-import { createUserSchema } from "../../validation/user.schema";
-import type { CreateUserInput } from "../../types";
-import { useCreateUser } from "../../api";
+import type { CreateUserInput } from "@/features/users";
 
 type Props = {
   onSuccess: (temporaryPassword: string) => void;

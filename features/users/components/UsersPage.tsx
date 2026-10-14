@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-
 import { Button } from "@/components/ui";
-import { UsersContent, CreateUserDialog } from "../components";
-import { USERS_TEXT } from "../constants/users-text";
+import { UsersContent, CreateUserDialog, USERS_TEXT } from "@/features/users";
 
 export function UsersPage() {
   const [open, setOpen] = useState(false);

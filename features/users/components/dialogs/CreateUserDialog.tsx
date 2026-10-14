@@ -7,9 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
-import { CreateUserForm } from "./CreateUserForm";
-import { CreateUserSuccessDialog } from "./CreateUserSuccessDialog";
-import { USERS_TEXT } from "../../constants/users-text";
+import {
+  CreateUserForm,
+  CreateUserSuccessDialog,
+  USERS_TEXT,
+} from "@/features/users";
 
 type Props = {
   open: boolean;

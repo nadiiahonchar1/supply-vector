@@ -6,9 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
-import type { User } from "../../types";
-import { USERS_TEXT } from "../../constants/users-text";
-import { ChangeUserStatusForm } from "../forms";
+import { ChangeUserStatusForm, USERS_TEXT } from "@/features/users";
+
+import type { User } from "@/features/users";
 
 type Props = {
   user: User;

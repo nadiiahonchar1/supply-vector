@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useUsers } from "../api";
-import { USERS_TEXT } from "../constants/users-text";
-import { UsersTable, PaginationBar } from "../components";
+import {
+  useUsers,
+  UsersTable,
+  PaginationBar,
+  USERS_TEXT,
+} from "@/features/users";
 
 export function UsersContent() {
   const [page, setPage] = useState(1);

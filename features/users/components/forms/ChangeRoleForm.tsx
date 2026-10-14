@@ -13,10 +13,9 @@ import {
 } from "@/components/ui";
 import { ROLES, canManageRole } from "@/lib/auth";
 import { useAuth } from "@/features/auth";
-import { USERS_TEXT } from "../../constants/users-text";
-import { changeRoleSchema } from "../../validation/user.schema";
-import { useChangeRole } from "../../api";
-import type { User, ChangeRoleInput } from "../../types";
+import { useChangeRole, changeRoleSchema, USERS_TEXT } from "@/features/users";
+
+import type { User, ChangeRoleInput } from "@/features/users";
 
 type Props = {
   user: User;

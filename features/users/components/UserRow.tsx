@@ -1,6 +1,7 @@
 import { TableCell, TableRow } from "@/components/ui";
-import type { User } from "../types";
-import { RoleBadge, UserActions, UserStatusBadge } from "../components";
+import { RoleBadge, UserActions, UserStatusBadge } from "@/features/users";
+
+import type { User } from "@/features/users";
 
 type Props = {
   user: User;

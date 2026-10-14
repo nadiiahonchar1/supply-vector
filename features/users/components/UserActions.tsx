@@ -10,8 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui";
-import { USERS_TEXT } from "../constants/users-text";
-import { ChangeRoleDialog, ChangeUserStatusDialog } from "./dialogs";
+import {
+  ChangeRoleDialog,
+  ChangeUserStatusDialog,
+  USERS_TEXT,
+} from "@/features/users";
 
 import type { User } from "../types";
 

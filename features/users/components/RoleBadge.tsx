@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui";
 import type { Role } from "@/features/auth";
-import { USERS_TEXT } from "../constants/users-text";
+import { USERS_TEXT } from "@/features/users";
 
 type Props = {
   role: Role;
