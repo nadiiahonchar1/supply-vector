@@ -1,18 +1,15 @@
 import { sql } from "@/db";
 
+import { PRODUCT_TEXT } from "@/features/products";
 import { hasPermission, PERMISSIONS } from "@/lib/auth";
-
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type { CurrentUser } from "@/features/auth";
-
 import type {
   Product,
   CreateProductInput,
   UpdateProductInput,
 } from "@/features/products";
-
-import { PRODUCT_TEXT } from "@/features/products";
 
 type ProductRow = {
   id: string;

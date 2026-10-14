@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 
-import type { AuditAction, AuditMeta } from "./audit.types";
+import type { AuditAction, AuditMeta } from "@/lib/audit";
 
 export class AuditService {
   static async log(params: {

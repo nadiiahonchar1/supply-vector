@@ -1,4 +1,4 @@
-import { ApiError } from "./api-error";
+import { ApiError } from "@/lib/errors";
 
 export class UnauthorizedError extends ApiError {
   constructor(message = "Unauthorized") {

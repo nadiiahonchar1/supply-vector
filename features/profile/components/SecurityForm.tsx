@@ -9,6 +9,7 @@ import {
   changePasswordFormSchema,
   PROFILE_TEXT,
 } from "@/features/profile";
+
 import type { ChangePasswordFormValues } from "@/features/profile";
 
 export function SecurityForm() {

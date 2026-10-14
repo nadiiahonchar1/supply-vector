@@ -2,11 +2,9 @@
 
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { AuthContext, logout } from "@/features/auth";
 
-import { AuthContext } from "./AuthContext";
-
-import { logout } from "../api/auth.api";
-import type { CurrentUser } from "../types";
+import type { CurrentUser } from "@/features/auth";
 
 type AuthProviderProps = {
   children: React.ReactNode;

@@ -7,9 +7,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui";
-import { APP_NAME } from "../config/app";
-import { AppSidebarNav } from "./AppSidebarNav";
-import { APP_SHELL_TEXT } from "@/features/app-shell";
+import { APP_NAME, AppSidebarNav, APP_SHELL_TEXT } from "@/features/app-shell";
 
 export function AppSidebar() {
   return (

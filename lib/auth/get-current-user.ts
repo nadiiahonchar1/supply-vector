@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { sql } from "@/db";
 import { getSessionFromCookie } from "@/lib/auth/server";
+
 import type { CurrentUser } from "@/features/auth";
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {

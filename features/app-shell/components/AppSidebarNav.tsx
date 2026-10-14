@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { navigation } from "../config/navigation";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui";
+import { navigation } from "@/features/app-shell";
 
 export function AppSidebarNav() {
   const pathname = usePathname();

@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { login } from "@/features/auth";
 
-import { login } from "../auth.api";
-import type { LoginInput } from "../../types";
+import type { LoginInput } from "@/features/auth";
 
 export function useLogin() {
   const router = useRouter();

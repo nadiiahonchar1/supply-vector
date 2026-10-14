@@ -49,6 +49,5 @@ export const PROFILE_TEXT = {
 
   saving: "Збереження...",
   changed: "Зберегти зміни",
-
   loading: "Завантаження...",
 } as const;

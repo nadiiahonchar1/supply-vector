@@ -7,6 +7,7 @@ import {
   SecurityForm,
   PROFILE_TEXT,
 } from "@/features/profile";
+
 import type { Profile } from "@/features/profile";
 
 type ProfilePageProps = {

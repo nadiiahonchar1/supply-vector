@@ -7,8 +7,9 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
-import type { NavigationItem } from "@/features/app-shell";
 import { APP_SHELL_TEXT } from "@/features/app-shell";
+
+import type { NavigationItem } from "@/features/app-shell";
 
 export const navigation: NavigationItem[] = [
   {

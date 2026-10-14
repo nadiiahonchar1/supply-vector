@@ -1,4 +1,4 @@
-import { PERMISSIONS, ROLES } from "@/lib/auth/permissions";
+import { PERMISSIONS, ROLES } from "@/lib/auth";
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 

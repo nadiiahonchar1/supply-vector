@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/errors/api-error";
+import { ApiError } from "@/lib/errors";
 
 async function request<T>(
   input: RequestInfo | URL,

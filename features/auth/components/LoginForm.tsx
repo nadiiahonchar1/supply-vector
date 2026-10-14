@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useLogin } from "../api/hooks";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormData } from "../validation/login.schema";
 import {
   Button,
   Card,
@@ -15,7 +13,9 @@ import {
   Input,
   Label,
 } from "@/components/ui";
-import { AUTH_TEXT } from "../constants/auth-text";
+import { useLogin, loginSchema, AUTH_TEXT } from "@/features/auth";
+
+import type { LoginFormData } from "@/features/auth";
 
 export function LoginForm() {
   const { login } = useLogin();

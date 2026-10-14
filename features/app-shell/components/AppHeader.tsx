@@ -1,8 +1,7 @@
 "use client";
 
 import { SidebarTrigger } from "@/components/ui";
-import { UserMenu } from "./UserMenu";
-import { APP_SHELL_TEXT } from "@/features/app-shell";
+import { UserMenu, APP_SHELL_TEXT } from "@/features/app-shell";
 
 export function AppHeader() {
   return (

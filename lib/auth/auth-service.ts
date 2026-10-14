@@ -1,11 +1,15 @@
 import { sql } from "@/db";
 
-import { verifyPassword } from "./password";
-import { createSession, deleteSession } from "./session";
-import { getCurrentUser } from "@/lib/auth/server";
+import {
+  verifyPassword,
+  createSession,
+  deleteSession,
+  getCurrentUser,
+} from "@/lib/auth/server";
 import { rolePermissions } from "@/lib/auth";
-import type { Role, Permission } from "@/features/auth";
 import { AUTH_TEXT } from "@/features/auth";
+
+import type { Role, Permission } from "@/features/auth";
 
 // =====================================
 // PENDING PASSWORD RESET CHECK

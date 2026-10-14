@@ -2,6 +2,7 @@ import { sql } from "@/db";
 import { INVENTORY_TEXT } from "@/features/inventory";
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+
 import type { CurrentUser } from "@/features/auth";
 import type {
   AdjustInventoryInput,

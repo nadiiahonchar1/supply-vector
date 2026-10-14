@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "../../context/useAuth";
+import { useAuth } from "@/features/auth";
 
 export const useLogout = () => {
   const { logout } = useAuth();

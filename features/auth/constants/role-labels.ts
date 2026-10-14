@@ -1,4 +1,4 @@
-import type { Role } from "../types";
+import type { Role } from "@/features/auth";
 
 export const ROLE_LABELS: Record<Role, string> = {
   superadmin: "Суперадміністратор",

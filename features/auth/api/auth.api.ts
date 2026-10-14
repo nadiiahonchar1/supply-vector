@@ -1,9 +1,6 @@
 import { apiClient } from "@/lib/api-client";
-import type {
-  CurrentUser,
-  LoginInput,
-  LoginResponse,
-} from "../types";
+
+import type { CurrentUser, LoginInput, LoginResponse } from "@/features/auth";
 
 function login(data: LoginInput) {
   return apiClient.post<LoginResponse>("/api/auth/login", data);

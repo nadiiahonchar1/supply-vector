@@ -1,6 +1,7 @@
 "use client";
 
 import { ProfileApi } from "@/features/profile";
+
 import type { Profile, UpdateProfileInput } from "@/features/profile";
 
 export function useUpdateProfile() {

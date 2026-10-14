@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext } from "react";
-
-import type { CurrentUser } from "../types";
+import type { CurrentUser } from "@/features/auth";
 
 export type AuthContextValue = {
   user: CurrentUser | null;

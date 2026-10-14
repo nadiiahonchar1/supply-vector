@@ -10,6 +10,7 @@ import {
   PROFILE_TEXT,
   updateProfileSchema,
 } from "@/features/profile";
+
 import type { UpdateProfileInput } from "@/features/profile";
 
 export function ProfileForm() {
