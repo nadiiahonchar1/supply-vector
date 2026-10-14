@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { requireUser } from "@/lib/auth/auth-service";
-import { AuditService } from "@/lib/audit/audit.service";
-import { handleApiError } from "@/lib/errors/handle-api-error";
-import { validate } from "@/lib/validation/validate";
-
-import { VehiclesService } from "@/lib/vehicles/vehicles.service";
-import { updateVehicleSchema } from "@/features/vehicles/validation/vehicle.schema";
+import { updateVehicleSchema } from "@/features/vehicles";
+import { requireUser } from "@/lib/auth/server";
+import { AuditService } from "@/lib/audit";
+import { handleApiError } from "@/lib/errors";
+import { validate } from "@/lib/validation";
+import { VehiclesService } from "@/lib/vehicles";
 
 type Params = {
   params: Promise<{ id: string }>;

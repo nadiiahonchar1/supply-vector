@@ -1,5 +1,6 @@
 import { sql } from "@/db";
 
+import { USERS_TEXT } from "@/features/users";
 import { getCurrentUser, hashPassword } from "@/lib/auth/server";
 import {
   canManageRole,
@@ -9,7 +10,6 @@ import {
   RolePolicy,
 } from "@/lib/auth";
 import { generateTemporaryPassword } from "@/lib/utils";
-
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 
 import type {
@@ -22,7 +22,6 @@ import type {
   PaginatedUsersResponse,
 } from "@/features/users";
 
-import { USERS_TEXT } from "@/features/users";
 
 type RoleRow = {
   id: string;

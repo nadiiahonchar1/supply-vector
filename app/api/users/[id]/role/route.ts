@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { changeRoleSchema } from "@/features/users";
 import { requireUser } from "@/lib/auth/server";
 import { UsersService } from "@/lib/users";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-import { changeRoleSchema } from "@/features/users/validation/user.schema";
 
 type Params = {
   params: Promise<{

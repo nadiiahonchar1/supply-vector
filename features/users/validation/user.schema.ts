@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ROLES } from "@/lib/auth/permissions";
+import { ROLES } from "@/lib/auth";
 
 export const createUserSchema = z.object({
   email: z.email("Введіть коректний email"),

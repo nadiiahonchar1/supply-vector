@@ -1,18 +1,15 @@
 import { sql } from "@/db";
 
-import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-
+import { VEHICLE_TEXT } from "@/features/vehicles";
+import type { CurrentUser } from "@/features/auth";
+import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
-
-import type { CurrentUser } from "@/features/auth/types";
 
 import type {
   Vehicle,
   CreateVehicleInput,
   UpdateVehicleInput,
-} from "@/features/vehicles/types";
-
-import { VEHICLE_TEXT } from "@/features/vehicles/constants/vehicle-text";
+} from "@/features/vehicles";
 
 type VehicleRow = {
   id: string;

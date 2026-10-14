@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui";
-import { USERS_TEXT } from "../constants/users-text";
+import { USERS_TEXT } from "@/features/users";
 
 type Props = {
   isActive: boolean;
