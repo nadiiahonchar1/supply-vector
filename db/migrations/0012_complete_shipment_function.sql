@@ -31,7 +31,11 @@ BEGIN
   WHERE id = p_shipment_id
   FOR UPDATE;
 
-  IF NOT FOUND OR v_shipment.status <> 'in_transit' THEN
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  IF v_shipment.status <> 'in_transit' THEN
     RETURN;
   END IF;
 
@@ -54,9 +58,11 @@ BEGIN
   FROM transfer_requests
   WHERE shipment_id = p_shipment_id;
 
-  IF NOT FOUND
-    OR v_request.status NOT IN ('pending', 'approved')
-  THEN
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  IF v_request.status NOT IN ('pending', 'approved') THEN
     RETURN;
   END IF;
 
@@ -105,8 +111,6 @@ BEGIN
   END IF;
 
   -- 6. Transfer every item.
-  -- Source and destination changes and movement records are
-  -- part of the same SQL statement.
   FOR v_item IN
     SELECT
       id AS shipment_item_id,
@@ -128,8 +132,12 @@ BEGIN
       AND product_id = v_item.product_id
     FOR UPDATE;
 
-    IF NOT FOUND
-      OR v_source_quantity < v_item.quantity
+    IF NOT FOUND THEN
+      RAISE EXCEPTION
+        'Source inventory changed during shipment completion';
+    END IF;
+
+    IF v_source_quantity < v_item.quantity
       OR v_source_reserved_quantity < v_item.quantity
     THEN
       RAISE EXCEPTION
