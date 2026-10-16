@@ -6,6 +6,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { splitStatements } from "./split-statements";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
@@ -28,25 +30,7 @@ async function getAppliedMigrations(sql: SqlClient): Promise<Set<string>> {
   return new Set(rows.map((row) => row.id));
 }
 
-function stripLineComments(fileContent: string): string {
-  return fileContent
-    .split("\n")
-    .map((line) => {
-      const commentIndex = line.indexOf("--");
-      return commentIndex === -1 ? line : line.slice(0, commentIndex);
-    })
-    .join("\n");
-}
-
-function splitStatements(fileContent: string): string[] {
-  return stripLineComments(fileContent)
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
-}
-
 async function run() {
- 
   const { sql } = await import("./index");
 
   await ensureMigrationsTable(sql);
