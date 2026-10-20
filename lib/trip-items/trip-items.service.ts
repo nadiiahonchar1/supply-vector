@@ -170,54 +170,22 @@ export class TripItemsService {
     }
 
     const rows = (await sql`
-    WITH request_lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(
-        hashtextextended(
-          ${data.transfer_request_id}::text,
-          0
-        )
-      )
-    ),
-    current_assignment AS (
       SELECT
-        COALESCE(SUM(ti.quantity), 0) AS assigned
-      FROM trip_items ti
-      CROSS JOIN request_lock
-      WHERE ti.transfer_request_id =
-        ${data.transfer_request_id}
-    ),
-    valid AS (
-      SELECT 1
-      FROM current_assignment ca
-      JOIN transfer_requests tr
-        ON tr.id = ${data.transfer_request_id}
-      WHERE ca.assigned + ${data.quantity} <= tr.quantity
-    )
-    INSERT INTO trip_items (
-      trip_id,
-      transfer_request_id,
-      pickup_stop_id,
-      dropoff_stop_id,
-      quantity,
-      created_at
-    )
-    SELECT
-      ${data.trip_id},
-      ${data.transfer_request_id},
-      ${data.pickup_stop_id ?? null},
-      ${data.dropoff_stop_id},
-      ${data.quantity},
-      NOW()
-    FROM valid
-    RETURNING
-      id,
-      trip_id,
-      transfer_request_id,
-      pickup_stop_id,
-      dropoff_stop_id,
-      quantity,
-      created_at
-  `) as TripItemRow[];
+        id,
+        trip_id,
+        transfer_request_id,
+        pickup_stop_id,
+        dropoff_stop_id,
+        quantity,
+        created_at
+      FROM create_trip_item(
+        ${data.trip_id}::uuid,
+        ${data.transfer_request_id}::uuid,
+        ${data.pickup_stop_id ?? null}::uuid,
+        ${data.dropoff_stop_id}::uuid,
+        ${data.quantity}::integer
+      )
+    `) as TripItemRow[];
 
     if (!rows.length) {
       throw new ValidationError(
@@ -339,49 +307,21 @@ export class TripItemsService {
     }
 
     const rows = (await sql`
-    WITH request_lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(
-        hashtextextended(
-          ${tripItem.transfer_request_id}::text,
-          0
-        )
-      )
-    ),
-    other_assignment AS (
       SELECT
-        COALESCE(SUM(ti.quantity), 0) AS assigned
-      FROM trip_items ti
-      CROSS JOIN request_lock
-      WHERE ti.transfer_request_id =
-        ${tripItem.transfer_request_id}
-        AND ti.id <> ${id}
-    ),
-    valid AS (
-      SELECT 1
-      FROM other_assignment oa
-      JOIN transfer_requests tr
-        ON tr.id = ${tripItem.transfer_request_id}
-      WHERE oa.assigned + ${nextQuantity} <= tr.quantity
-    )
-    UPDATE trip_items
-    SET
-      quantity = ${nextQuantity},
-      pickup_stop_id = ${nextPickup},
-      dropoff_stop_id = ${nextDropoff}
-    WHERE id = ${id}
-      AND EXISTS (
-        SELECT 1
-        FROM valid
+        id,
+        trip_id,
+        transfer_request_id,
+        pickup_stop_id,
+        dropoff_stop_id,
+        quantity,
+        created_at
+      FROM update_trip_item(
+        ${id}::uuid,
+        ${nextPickup}::uuid,
+        ${nextDropoff}::uuid,
+        ${nextQuantity}::integer
       )
-    RETURNING
-      id,
-      trip_id,
-      transfer_request_id,
-      pickup_stop_id,
-      dropoff_stop_id,
-      quantity,
-      created_at
-  `) as TripItemRow[];
+    `) as TripItemRow[];
 
     if (!rows.length) {
       throw new ValidationError(
