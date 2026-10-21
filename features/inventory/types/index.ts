@@ -37,3 +37,10 @@ export type AdjustInventoryInput = {
   quantity_change: number;
   movement_type: "purchase" | "sale" | "adjustment" | "return";
 };
+
+export type InventoryFilters = {
+  store_id?: string;
+  product_id?: string;
+  city?: string;
+  low_stock?: boolean;
+};
