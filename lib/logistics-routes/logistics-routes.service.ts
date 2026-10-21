@@ -1,5 +1,5 @@
 import { sql } from "@/db";
-import { LOGISTICS_ROUTE_TEXT } from "@/features/logistics-routes";
+import { LOGISTICS_ROUTE_TEXT } from "@/features/logistics/logistics-routes";
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
@@ -8,7 +8,7 @@ import type {
   CreateLogisticsRouteInput,
   LogisticsRoute,
   UpdateLogisticsRouteInput,
-} from "@/features/logistics-routes/types";
+} from "@/features/logistics/logistics-routes/types";
 
 type LogisticsRouteRow = LogisticsRoute;
 

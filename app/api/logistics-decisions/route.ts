@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createLogisticsDecisionSchema } from "@/features/logistics-decisions";
+import { createLogisticsDecisionSchema } from "@/features/logistics/logistics-decisions";
 import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
