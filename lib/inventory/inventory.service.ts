@@ -8,6 +8,7 @@ import type {
   AdjustInventoryInput,
   CreateInventoryInput,
   Inventory,
+  InventoryFilters,
   InventoryWithDetails,
   UpdateInventoryInput,
 } from "@/features/inventory";
@@ -15,35 +16,54 @@ import type {
 export class InventoryService {
   static async getInventory(
     currentUser: CurrentUser,
+    filters: InventoryFilters = {},
   ): Promise<InventoryWithDetails[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.INVENTORY_VIEW)) {
       throw new ForbiddenError(INVENTORY_TEXT.error.forbidden_view);
     }
 
     const result = await sql`
-      SELECT
-        i.id,
-        i.store_id,
-        i.product_id,
-        i.quantity,
-        i.reserved_quantity,
-        i.min_stock,
-        i.max_stock,
-        i.created_at,
-        i.updated_at,
+  SELECT
+    i.id,
+    i.store_id,
+    i.product_id,
+    i.quantity,
+    i.reserved_quantity,
+    i.min_stock,
+    i.max_stock,
+    i.created_at,
+    i.updated_at,
 
-        s.name AS store_name,
-        s.city,
+    s.name AS store_name,
+    s.city,
 
-        p.name AS product_name,
-        p.sku
-      FROM inventory i
-      JOIN stores s
-        ON s.id = i.store_id
-      JOIN products p
-        ON p.id = i.product_id
-      ORDER BY s.name, p.name
-    `;
+    p.name AS product_name,
+    p.sku
+  FROM inventory i
+  JOIN stores s
+    ON s.id = i.store_id
+  JOIN products p
+    ON p.id = i.product_id
+  WHERE
+    (${filters.store_id ?? null}::uuid IS NULL
+      OR i.store_id = ${filters.store_id ?? null}::uuid)
+    AND (${filters.product_id ?? null}::uuid IS NULL
+      OR i.product_id = ${filters.product_id ?? null}::uuid)
+    AND (${filters.city ?? null}::text IS NULL
+      OR s.city ILIKE ${filters.city ? `%${filters.city}%` : null})
+    AND (
+      ${filters.low_stock ?? null}::boolean IS NULL
+      OR (
+        ${filters.low_stock ?? null}::boolean = TRUE
+        AND i.quantity < i.min_stock
+      )
+      OR (
+        ${filters.low_stock ?? null}::boolean = FALSE
+        AND i.quantity >= i.min_stock
+      )
+    )
+  ORDER BY s.name, p.name
+`;
 
     return result as InventoryWithDetails[];
   }

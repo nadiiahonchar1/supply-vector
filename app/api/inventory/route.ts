@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createInventorySchema } from "@/features/inventory";
+import {
+  createInventorySchema,
+  inventoryFiltersSchema,
+} from "@/features/inventory";
 import { InventoryService } from "@/lib/inventory";
 import { AuditService } from "@/lib/audit";
 import { validate } from "@/lib/validation";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const currentUser = await requireUser();
+    const searchParams = request.nextUrl.searchParams;
 
-    const inventory = await InventoryService.getInventory(currentUser);
+    const input = validate(inventoryFiltersSchema, {
+      store_id: searchParams.get("store_id") ?? undefined,
+      product_id: searchParams.get("product_id") ?? undefined,
+      city: searchParams.get("city") ?? undefined,
+      low_stock: searchParams.get("low_stock") ?? undefined,
+    });
+
+    const filters = {
+      ...input,
+      low_stock:
+        input.low_stock === undefined ? undefined : input.low_stock === "true",
+    };
+
+    const inventory = await InventoryService.getInventory(currentUser, filters);
 
     return NextResponse.json(inventory);
   } catch (error) {
