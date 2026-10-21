@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
-import { LogisticsDecisionsService } from "@/lib/logistics/logistics-decisions";
+import { LogisticsDecisionsService } from "@/lib/logistics";
 
 type RouteContext = {
   params: Promise<{

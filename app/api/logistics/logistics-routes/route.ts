@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createLogisticsRouteSchema } from "@/features/logistics/logistics-routes";
+import { createLogisticsRouteSchema } from "@/features/logistics";
 import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
-import { LogisticsRoutesService } from "@/lib/logistics/logistics-routes";
+import { LogisticsRoutesService } from "@/lib/logistics";
 import { validate } from "@/lib/validation";
 
 export async function GET() {
