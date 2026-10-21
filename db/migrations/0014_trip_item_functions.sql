@@ -15,8 +15,7 @@ AS $$
 DECLARE
   v_request_quantity integer;
   v_assigned integer;
-BEGIN
-  -- Serialize all assignments for this transfer request.
+BEGIN  
   SELECT tr.quantity
   INTO v_request_quantity
   FROM transfer_requests tr
@@ -27,7 +26,6 @@ BEGIN
     RETURN;
   END IF;
  
-  -- A new statement: fresh snapshot, taken after the lock above was granted.
   SELECT COALESCE(SUM(ti.quantity), 0)
   INTO v_assigned
   FROM trip_items ti

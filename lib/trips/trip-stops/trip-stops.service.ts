@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 
-import { TRIP_STOP_TEXT } from "@/features/trips/trip-stops";
+import { TRIP_STOP_TEXT } from "@/features/trips";
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
@@ -9,7 +9,7 @@ import type {
   CreateTripStopInput,
   TripStop,
   UpdateTripStopInput,
-} from "@/features/trips/trip-stops";
+} from "@/features/trips";
 
 type TripStopRow = TripStop;
 

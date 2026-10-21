@@ -267,9 +267,7 @@ export class TripsService {
         updated_at
     `) as TripRow[];
     } catch (error) {
-      // The partial unique index from 0010 (one ready/in_transit trip per
-      // vehicle) is the real guard when two requests race past the check
-      // above. Translate its violation instead of leaking a raw DB error.
+     
       if (error instanceof Error && "code" in error && error.code === "23505") {
         throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
       }

@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-import { TripItemsService } from "@/lib/trip-items";
+import { TripItemsService } from "@/lib/trips/trip-items";
 
 export async function GET() {
   try {
