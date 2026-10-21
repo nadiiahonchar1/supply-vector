@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { updateTripStopSchema } from "@/features/trip-stops";
+import { updateTripStopSchema } from "@/features/trips/trip-stops";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";

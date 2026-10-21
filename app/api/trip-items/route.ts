@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createTripItemSchema } from "@/features/trip-items";
+import { createTripItemSchema } from "@/features/trips/trip-items";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";

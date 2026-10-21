@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 
-import { TRIP_ITEM_TEXT } from "@/features/trip-items";
+import { TRIP_ITEM_TEXT } from "@/features/trips/trip-items";
 import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
@@ -9,7 +9,7 @@ import type {
   CreateTripItemInput,
   TripItem,
   UpdateTripItemInput,
-} from "@/features/trip-items";
+} from "@/features/trips/trip-items";
 
 type TripItemRow = TripItem;
 
