@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { updateTripStopSchema } from "@/features/trips/trip-stops";
+import { updateTripStopSchema } from "@/features/trips";
 import { requireUser } from "@/lib/auth/server";
 import { AuditService } from "@/lib/audit";
 import { handleApiError } from "@/lib/errors";
 import { validate } from "@/lib/validation";
-import { TripStopsService } from "@/lib/trips/trip-stops";
+import { TripStopsService } from "@/lib/trips";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
