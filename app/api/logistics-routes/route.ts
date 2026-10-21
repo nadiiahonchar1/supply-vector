@@ -4,7 +4,7 @@ import { createLogisticsRouteSchema } from "@/features/logistics/logistics-route
 import { AuditService } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
-import { LogisticsRoutesService } from "@/lib/logistics-routes";
+import { LogisticsRoutesService } from "@/lib/logistics/logistics-routes";
 import { validate } from "@/lib/validation";
 
 export async function GET() {

@@ -1,5 +1,5 @@
 import { sql } from "@/db";
-import { LOGISTICS_DECISION_TEXT } from "@/features/logistics/logistics-decisions";
+import { LOGISTICS_DECISION_TEXT } from "@/features/logistics";
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
@@ -7,7 +7,7 @@ import type { CurrentUser } from "@/features/auth";
 import type {
   CreateLogisticsDecisionInput,
   LogisticsDecision,
-} from "@/features/logistics/logistics-decisions";
+} from "@/features/logistics";
 
 type LogisticsDecisionRow = LogisticsDecision;
 
