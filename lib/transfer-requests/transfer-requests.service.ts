@@ -229,6 +229,8 @@ export const TransferRequestsService = {
           ELSE cancelled_at
         END
       WHERE id = ${id}
+        AND status = ${existingRequest.status}
+        AND shipment_id IS NOT DISTINCT FROM ${existingRequest.shipment_id}::uuid
       RETURNING *
     `;
 
