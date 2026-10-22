@@ -20,16 +20,33 @@ export const updateInventorySchema = z
     },
   );
 
-export const adjustInventorySchema = z.object({
-  quantity_change: z
-    .number()
-    .int()
-    .refine((value) => value !== 0, {
-      message: "Зміна кількості не може дорівнювати нулю",
-    }),
+export const adjustInventorySchema = z
+  .object({
+    quantity_change: z
+      .number()
+      .int()
+      .refine((value) => value !== 0, {
+        message: "Зміна кількості не може дорівнювати нулю",
+      }),
 
-  movement_type: z.enum(["purchase", "sale", "adjustment", "return"]),
-});
+    movement_type: z.enum(["purchase", "sale", "adjustment", "return"]),
+  })
+  .superRefine((data, ctx) => {
+    const { quantity_change, movement_type } = data;
+
+    const invalidDirection =
+      (movement_type === "purchase" && quantity_change < 0) ||
+      (movement_type === "return" && quantity_change < 0) ||
+      (movement_type === "sale" && quantity_change > 0);
+
+    if (invalidDirection) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["quantity_change"],
+        message: "Напрямок зміни кількості не відповідає типу руху товару",
+      });
+    }
+  });
 
 export const inventoryFiltersSchema = z.object({
   store_id: z.string().uuid().optional(),
