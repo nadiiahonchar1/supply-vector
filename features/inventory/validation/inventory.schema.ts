@@ -37,3 +37,18 @@ export const inventoryFiltersSchema = z.object({
   city: z.string().trim().min(1).optional(),
   low_stock: z.enum(["true", "false"]).optional(),
 });
+
+export const inventoryMovementFiltersSchema = z.object({
+  store_id: z.string().uuid().optional(),
+  product_id: z.string().uuid().optional(),
+  movement_type: z
+    .enum([
+      "purchase",
+      "sale",
+      "transfer_in",
+      "transfer_out",
+      "adjustment",
+      "return",
+    ])
+    .optional(),
+});
