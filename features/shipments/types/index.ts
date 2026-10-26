@@ -26,6 +26,7 @@ export type ShipmentItem = {
 
 export type CreateShipmentInput = {
   transfer_request_id: string;
+  quantity: number;
 };
 
 export type UpdateShipmentInput = {
