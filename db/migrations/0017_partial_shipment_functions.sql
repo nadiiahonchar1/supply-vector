@@ -340,7 +340,7 @@ BEGIN
   UPDATE transfer_requests
   SET status = CASE
         WHEN v_delivered_quantity >= quantity THEN 'fulfilled'
-        ELSE v_request.status
+        ELSE 'approved'
       END,
       updated_by = p_user_id,
       updated_at = NOW()
