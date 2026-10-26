@@ -108,129 +108,83 @@ export class ShipmentsService {
       .toUpperCase()}`;
 
     const rows = (await sql`
-    WITH locked_request AS MATERIALIZED (
-      SELECT
-        id,
-        source_store_id,
-        destination_store_id,
-        product_id,
-        quantity
-      FROM transfer_requests
-      WHERE id = ${data.transfer_request_id}
-        AND shipment_id IS NULL
-        AND status IN ('pending', 'approved')
-      FOR UPDATE
-    ),
-
-    reserved_inventory AS (
-      UPDATE inventory i
-      SET
-        reserved_quantity = i.reserved_quantity + tr.quantity,
-        updated_at = NOW()
-      FROM locked_request tr
-      WHERE i.store_id = tr.source_store_id
-        AND i.product_id = tr.product_id
-        AND i.quantity - i.reserved_quantity - i.min_stock >= tr.quantity
-      RETURNING i.store_id, i.product_id
-    ),
-
-    created_shipment AS (
-      INSERT INTO shipments (
-        id,
-        shipment_number,
-        source_store_id,
-        destination_store_id,
-        status,
-        created_by,
-        updated_by
-      )
-      SELECT
+      SELECT *
+      FROM create_partial_shipment(
         ${shipmentId},
         ${shipmentNumber},
-        tr.source_store_id,
-        tr.destination_store_id,
-        'pending',
-        ${currentUser.id},
+        ${data.transfer_request_id},
+        ${data.quantity},
         ${currentUser.id}
-      FROM locked_request tr
-      JOIN reserved_inventory ri
-        ON ri.store_id = tr.source_store_id
-        AND ri.product_id = tr.product_id
-      RETURNING
-        id,
-        shipment_number,
-        source_store_id,
-        destination_store_id,
-        status,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        completed_at
-    ),
-
-    created_item AS (
-      INSERT INTO shipment_items (
-        shipment_id,
-        product_id,
-        quantity
       )
+    `) as Shipment[];
+
+    if (rows.length > 0) {
+      return rows[0];
+    }
+
+    const requests = (await sql`
       SELECT
-        cs.id,
+        tr.id,
+        tr.status,
+        tr.quantity,
+        tr.source_store_id,
         tr.product_id,
-        tr.quantity
-      FROM created_shipment cs
-      JOIN locked_request tr ON TRUE
-      RETURNING id
-    ),
-
-    updated_transfer_request AS (
-      UPDATE transfer_requests tr
-      SET
-        shipment_id = cs.id,
-        updated_by = ${currentUser.id},
-        updated_at = NOW()
-      FROM created_shipment cs
+        COALESCE(
+          (
+            SELECT SUM(si.quantity)
+            FROM shipments s
+            JOIN shipment_items si
+              ON si.shipment_id = s.id
+            WHERE s.transfer_request_id = tr.id
+              AND s.status <> 'cancelled'
+          ),
+          0
+        ) AS allocated_quantity
+      FROM transfer_requests tr
       WHERE tr.id = ${data.transfer_request_id}
-        AND tr.shipment_id IS NULL
-        AND tr.status IN ('pending', 'approved')
-      RETURNING tr.id
-    )
-
-    SELECT cs.*
-    FROM created_shipment cs
-    JOIN updated_transfer_request utr ON TRUE
-    WHERE EXISTS (SELECT 1 FROM created_item)
-  `) as Shipment[];
-
-    if (rows.length === 0) {
-      const requests = (await sql`
-      SELECT id, shipment_id, status
-      FROM transfer_requests
-      WHERE id = ${data.transfer_request_id}
       LIMIT 1
     `) as {
-        id: string;
-        shipment_id: string | null;
-        status: string;
-      }[];
+      id: string;
+      status: string;
+      quantity: number;
+      source_store_id: string;
+      product_id: string;
+      allocated_quantity: number | string;
+    }[];
 
-      if (!requests.length) {
-        throw new NotFoundError(SHIPMENT_TEXT.error.transfer_request_not_found);
-      }
+    if (!requests.length) {
+      throw new NotFoundError(SHIPMENT_TEXT.error.transfer_request_not_found);
+    }
 
-      if (requests[0].shipment_id) {
-        throw new ValidationError(SHIPMENT_TEXT.error.shipment_already_exists);
-      }
+    const request = requests[0];
+    const allocatedQuantity = Number(request.allocated_quantity);
 
-      if (!["pending", "approved"].includes(requests[0].status)) {
-        throw new ValidationError(SHIPMENT_TEXT.error.invalid_transfer_request);
-      }
+    if (!["pending", "approved"].includes(request.status)) {
+      throw new ValidationError(SHIPMENT_TEXT.error.invalid_transfer_request);
+    }
 
+    if (allocatedQuantity + data.quantity > request.quantity) {
+      throw new ValidationError(SHIPMENT_TEXT.error.quantity_exceeds_remaining);
+    }
+
+    const inventoryRows = (await sql`
+      SELECT
+        quantity - reserved_quantity - min_stock AS available_quantity
+      FROM inventory
+      WHERE store_id = ${request.source_store_id}
+        AND product_id = ${request.product_id}
+      LIMIT 1
+    `) as { available_quantity: number }[];
+
+    if (
+      !inventoryRows.length ||
+      Number(inventoryRows[0].available_quantity) < data.quantity
+    ) {
       throw new ValidationError(SHIPMENT_TEXT.error.insufficient_inventory);
     }
 
-    return rows[0];
+    throw new ValidationError(SHIPMENT_TEXT.error.failed_shipment
+    );
   }
 
   static async updateShipment(

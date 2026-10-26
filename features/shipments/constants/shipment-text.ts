@@ -13,6 +13,8 @@ export const SHIPMENT_TEXT = {
     invalid_shipment_completion: "Не вдалося завершити відправлення",
     invalid_shipment_cancellation: "Не вдалося скасувати відправлення",
     forbidden_cancel: "Недостатньо прав для скасування відправлення",
+    failed_shipment: "Не вдалося створити відправлення. Перевір статус запиту та доступний залишок",
+    quantity_exceeds_remaining: "Кількість товару у відправленні перевищує залишок за запитом на переміщення",
   },
   success: {
     created: "Відправлення успішно створено",
