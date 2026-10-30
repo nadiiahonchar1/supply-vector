@@ -7,6 +7,9 @@
 -- CHECK TRIP CAPACITY BY SHIPMENT
 -- =============================================
 
+DROP FUNCTION IF EXISTS create_trip_item(UUID, UUID, UUID, UUID, INTEGER);
+DROP FUNCTION IF EXISTS trip_item_fits_capacity(UUID, UUID, INTEGER, UUID);
+
 CREATE OR REPLACE FUNCTION trip_item_fits_capacity(
   p_trip_id UUID,
   p_shipment_id UUID,
@@ -28,7 +31,7 @@ DECLARE
 
   v_missing_weights BIGINT;
   v_missing_volumes BIGINT;
-BEGIN
+BEGIN  
   SELECT
     v.capacity_weight,
     v.capacity_volume
@@ -39,7 +42,7 @@ BEGIN
   JOIN vehicles v ON v.id = t.vehicle_id
   WHERE t.id = p_trip_id;
 
-  IF NOT FOUND THEN
+  IF NOT FOUND OR v_capacity_weight IS NULL THEN
     RETURN FALSE;
   END IF;
 
@@ -50,10 +53,8 @@ BEGIN
     v_product_weight,
     v_product_volume
   FROM shipments s
-  JOIN shipment_items si
-    ON si.shipment_id = s.id
-  JOIN products p
-    ON p.id = si.product_id
+  JOIN shipment_items si ON si.shipment_id = s.id
+  JOIN products p ON p.id = si.product_id
   WHERE s.id = p_shipment_id;
 
   IF NOT FOUND OR v_product_weight IS NULL THEN
@@ -66,34 +67,54 @@ BEGIN
   END IF;
 
   SELECT
-    COALESCE(SUM(ti.quantity * p.weight_kg), 0),
-    COALESCE(SUM(ti.quantity * p.volume_m3), 0),
+    COALESCE(SUM(items.quantity * items.weight_kg), 0),
+    COALESCE(SUM(items.quantity * items.volume_m3), 0),
 
     COUNT(*) FILTER (
-      WHERE p.weight_kg IS NULL
+      WHERE items.weight_kg IS NULL
     ),
 
     COUNT(*) FILTER (
       WHERE v_capacity_volume IS NOT NULL
-        AND p.volume_m3 IS NULL
+        AND items.volume_m3 IS NULL
     )
   INTO
     v_loaded_weight,
     v_loaded_volume,
     v_missing_weights,
     v_missing_volumes
-  FROM trip_items ti
-  JOIN shipments s
-    ON s.id = ti.shipment_id
-  JOIN shipment_items si
-    ON si.shipment_id = s.id
-  LEFT JOIN products p
-    ON p.id = si.product_id
-  WHERE ti.trip_id = p_trip_id
-    AND (
-      p_exclude_trip_item_id IS NULL
-      OR ti.id <> p_exclude_trip_item_id
-    );
+  FROM (    
+    SELECT
+      ti.quantity,
+      p.weight_kg,
+      p.volume_m3
+    FROM trip_items ti
+    JOIN shipments s ON s.id = ti.shipment_id
+    JOIN shipment_items si ON si.shipment_id = s.id
+    LEFT JOIN products p ON p.id = si.product_id
+    WHERE ti.trip_id = p_trip_id
+      AND ti.shipment_id IS NOT NULL
+      AND (
+        p_exclude_trip_item_id IS NULL
+        OR ti.id <> p_exclude_trip_item_id
+      )
+
+    UNION ALL
+
+    SELECT
+      ti.quantity,
+      p.weight_kg,
+      p.volume_m3
+    FROM trip_items ti
+    JOIN transfer_requests tr ON tr.id = ti.transfer_request_id
+    LEFT JOIN products p ON p.id = tr.product_id
+    WHERE ti.trip_id = p_trip_id
+      AND ti.shipment_id IS NULL
+      AND (
+        p_exclude_trip_item_id IS NULL
+        OR ti.id <> p_exclude_trip_item_id
+      )
+  ) AS items;
 
   IF v_missing_weights > 0 THEN
     RETURN FALSE;
@@ -202,15 +223,15 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT EXISTS (
+  IF p_pickup_stop_id IS NOT NULL AND NOT EXISTS (
     SELECT 1
     FROM trip_stops ts
     WHERE ts.id = p_pickup_stop_id
-      AND ts.trip_id = p_trip_id
-      AND ts.store_id = v_shipment.source_store_id
-  ) THEN
-    RETURN;
-  END IF;
+        AND ts.trip_id = p_trip_id
+        AND ts.store_id = v_shipment.source_store_id
+    ) THEN
+        RETURN;
+    END IF;
 
   IF NOT EXISTS (
     SELECT 1
@@ -324,15 +345,15 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT EXISTS (
+  IF p_pickup_stop_id IS NOT NULL AND NOT EXISTS (
     SELECT 1
     FROM trip_stops ts
     WHERE ts.id = p_pickup_stop_id
-      AND ts.trip_id = v_item.trip_id
-      AND ts.store_id = v_shipment.source_store_id
-  ) THEN
-    RETURN;
-  END IF;
+        AND ts.trip_id = p_trip_id
+        AND ts.store_id = v_shipment.source_store_id
+    ) THEN
+        RETURN;
+    END IF;
 
   IF NOT EXISTS (
     SELECT 1
