@@ -1,6 +1,7 @@
 export type TripItem = {
   id: string;
   trip_id: string;
+  shipment_id: string | null;
   transfer_request_id: string;
   pickup_stop_id: string | null;
   dropoff_stop_id: string;
@@ -10,7 +11,7 @@ export type TripItem = {
 
 export type CreateTripItemInput = {
   trip_id: string;
-  transfer_request_id: string;
+  shipment_id: string;  
   pickup_stop_id?: string | null;
   dropoff_stop_id: string;
   quantity: number;
