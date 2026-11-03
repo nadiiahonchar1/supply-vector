@@ -38,3 +38,22 @@ export type LogisticsDecisionEngineResult = {
   transfer_request_id: string;
   recommendations: LogisticsDecisionRecommendation[];
 };
+
+export type LogisticsNewTripVehicleCandidate = {
+  vehicle_id: string;
+  vehicle_name: string;
+  vehicle_type: string;
+
+  capacity_weight: number;
+  capacity_volume: number | null;
+
+  cost_per_km: number;
+  fixed_cost: number;
+
+  distance_km: number;
+  estimated_duration_minutes: number | null;
+  estimated_trip_cost: number;
+
+  available_from: string | null;
+  available_to: string | null;
+};
