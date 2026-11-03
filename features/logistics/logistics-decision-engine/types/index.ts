@@ -21,6 +21,7 @@ export type LogisticsExistingTripCandidate = {
 
 export type LogisticsTripCandidate = LogisticsShipmentCandidate & {
   trips: LogisticsExistingTripCandidate[];
+  new_trip_vehicles: LogisticsNewTripVehicleCandidate[];
 };
 
 export type LogisticsDecisionRecommendation = {
