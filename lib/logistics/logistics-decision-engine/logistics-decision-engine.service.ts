@@ -5,6 +5,7 @@ import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import type {
   LogisticsExistingTripCandidate,
+  LogisticsNewTripVehicleCandidate,
   LogisticsTripCandidate,
 } from "@/features/logistics";
 
@@ -26,6 +27,8 @@ type ShipmentCandidateRow = {
   assigned_quantity: number;
   remaining_quantity: number;
 };
+
+type NewTripVehicleCandidateRow = LogisticsNewTripVehicleCandidate;
 
 export class LogisticsDecisionEngineService {
   static async findExistingTripCandidates(
@@ -132,12 +135,79 @@ export class LogisticsDecisionEngineService {
           ) = TRUE
         ORDER BY t.id, pickup.sequence, dropoff.sequence
       `) as LogisticsExistingTripCandidate[];
+        
+        const vehicleRows = (await sql`
+  SELECT
+    v.id AS vehicle_id,
+    v.name AS vehicle_name,
+    v.type AS vehicle_type,
+
+    v.capacity_weight,
+    v.capacity_volume,
+
+    v.cost_per_km,
+    v.fixed_cost,
+
+    lr.distance_km,
+    lr.estimated_duration_minutes,
+
+    ROUND(
+      (
+        v.fixed_cost
+        + lr.distance_km * v.cost_per_km
+      )::NUMERIC,
+      2
+    ) AS estimated_trip_cost,
+
+    v.available_from,
+    v.available_to
+
+  FROM vehicles v
+
+  JOIN logistics_routes lr
+    ON lr.store_a_id = LEAST(
+      ${request.source_store_id}::UUID,
+      ${request.destination_store_id}::UUID
+    )
+    AND lr.store_b_id = GREATEST(
+      ${request.source_store_id}::UUID,
+      ${request.destination_store_id}::UUID
+    )
+
+  JOIN products p
+    ON p.id = ${request.product_id}
+
+  WHERE v.is_active = TRUE
+    AND lr.is_active = TRUE
+
+    AND v.capacity_weight >=
+      ${shipment.remaining_quantity} * p.weight_kg
+
+    AND (
+      v.capacity_volume IS NULL
+      OR (
+        p.volume_m3 IS NOT NULL
+        AND v.capacity_volume >=
+          ${shipment.remaining_quantity} * p.volume_m3
+      )
+    )
+
+    AND NOT EXISTS (
+      SELECT 1
+      FROM trips active_trip
+      WHERE active_trip.vehicle_id = v.id
+        AND active_trip.status IN ('ready', 'in_transit')
+    )
+
+  ORDER BY estimated_trip_cost ASC, v.name ASC
+`) as NewTripVehicleCandidateRow[];
 
       candidates.push({
         shipment_id: shipment.shipment_id,
         shipment_number: shipment.shipment_number,
         remaining_quantity: Number(shipment.remaining_quantity),
         trips: tripRows,
+        new_trip_vehicles: vehicleRows,
       });
     }
 
