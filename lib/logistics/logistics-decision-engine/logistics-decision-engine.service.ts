@@ -1,15 +1,16 @@
 import { sql } from "@/db";
-
-import { LOGISTICS_DECISION_ENGINE_TEXT } from '@/features/logistics';
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
-import type {
-  LogisticsExistingTripCandidate,
-  LogisticsNewTripVehicleCandidate,
-  LogisticsTripCandidate,
-} from "@/features/logistics";
 
 import type { CurrentUser } from "@/features/auth";
+import {
+  LOGISTICS_DECISION_ENGINE_TEXT,
+  type LogisticsDecisionEngineResult,
+  type LogisticsDecisionRecommendation,
+  type LogisticsExistingTripCandidate,
+  type LogisticsNewTripVehicleCandidate,
+  type LogisticsTripCandidate,
+} from "@/features/logistics";
 
 type TransferRequestRow = {
   id: string;
@@ -36,7 +37,9 @@ export class LogisticsDecisionEngineService {
     currentUser: CurrentUser,
   ): Promise<LogisticsTripCandidate[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
-      throw new ForbiddenError(LOGISTICS_DECISION_ENGINE_TEXT.error.forbidden_view);
+      throw new ForbiddenError(
+        LOGISTICS_DECISION_ENGINE_TEXT.error.forbidden_view,
+      );
     }
 
     const requestRows = (await sql`
@@ -53,13 +56,17 @@ export class LogisticsDecisionEngineService {
     `) as TransferRequestRow[];
 
     if (!requestRows.length) {
-      throw new NotFoundError(LOGISTICS_DECISION_ENGINE_TEXT.error.request_not_found);
+      throw new NotFoundError(
+        LOGISTICS_DECISION_ENGINE_TEXT.error.request_not_found,
+      );
     }
 
     const request = requestRows[0];
 
     if (request.status !== "approved") {
-      throw new ValidationError(LOGISTICS_DECISION_ENGINE_TEXT.error.request_not_approved);
+      throw new ValidationError(
+        LOGISTICS_DECISION_ENGINE_TEXT.error.request_not_approved,
+      );
     }
 
     const shipmentRows = (await sql`
@@ -135,72 +142,59 @@ export class LogisticsDecisionEngineService {
           ) = TRUE
         ORDER BY t.id, pickup.sequence, dropoff.sequence
       `) as LogisticsExistingTripCandidate[];
-        
-        const vehicleRows = (await sql`
-  SELECT
-    v.id AS vehicle_id,
-    v.name AS vehicle_name,
-    v.type AS vehicle_type,
 
-    v.capacity_weight,
-    v.capacity_volume,
-
-    v.cost_per_km,
-    v.fixed_cost,
-
-    lr.distance_km,
-    lr.estimated_duration_minutes,
-
-    ROUND(
-      (
-        v.fixed_cost
-        + lr.distance_km * v.cost_per_km
-      )::NUMERIC,
-      2
-    ) AS estimated_trip_cost,
-
-    v.available_from,
-    v.available_to
-
-  FROM vehicles v
-
-  JOIN logistics_routes lr
-    ON lr.store_a_id = LEAST(
-      ${request.source_store_id}::UUID,
-      ${request.destination_store_id}::UUID
-    )
-    AND lr.store_b_id = GREATEST(
-      ${request.source_store_id}::UUID,
-      ${request.destination_store_id}::UUID
-    )
-
-  JOIN products p
-    ON p.id = ${request.product_id}
-
-  WHERE v.is_active = TRUE
-    AND lr.is_active = TRUE
-
-    AND v.capacity_weight >=
-      ${shipment.remaining_quantity} * p.weight_kg
-
-    AND (
-      v.capacity_volume IS NULL
-      OR (
-        p.volume_m3 IS NOT NULL
-        AND v.capacity_volume >=
-          ${shipment.remaining_quantity} * p.volume_m3
-      )
-    )
-
-    AND NOT EXISTS (
-      SELECT 1
-      FROM trips active_trip
-      WHERE active_trip.vehicle_id = v.id
-        AND active_trip.status IN ('ready', 'in_transit')
-    )
-
-  ORDER BY estimated_trip_cost ASC, v.name ASC
-`) as NewTripVehicleCandidateRow[];
+      const vehicleRows = (await sql`
+        SELECT
+          v.id AS vehicle_id,
+          v.name AS vehicle_name,
+          v.type AS vehicle_type,
+          v.capacity_weight,
+          v.capacity_volume,
+          v.cost_per_km,
+          v.fixed_cost,
+          lr.distance_km,
+          lr.estimated_duration_minutes,
+          ROUND(
+            (
+              v.fixed_cost
+              + lr.distance_km * v.cost_per_km
+            )::NUMERIC,
+            2
+          ) AS estimated_trip_cost,
+          v.available_from,
+          v.available_to
+        FROM vehicles v
+        JOIN logistics_routes lr
+          ON lr.store_a_id = LEAST(
+            ${request.source_store_id}::UUID,
+            ${request.destination_store_id}::UUID
+          )
+          AND lr.store_b_id = GREATEST(
+            ${request.source_store_id}::UUID,
+            ${request.destination_store_id}::UUID
+          )
+        JOIN products p
+          ON p.id = ${request.product_id}
+        WHERE v.is_active = TRUE
+          AND lr.is_active = TRUE
+          AND v.capacity_weight >=
+            ${shipment.remaining_quantity} * p.weight_kg
+          AND (
+            v.capacity_volume IS NULL
+            OR (
+              p.volume_m3 IS NOT NULL
+              AND v.capacity_volume >=
+                ${shipment.remaining_quantity} * p.volume_m3
+            )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM trips active_trip
+            WHERE active_trip.vehicle_id = v.id
+              AND active_trip.status IN ('ready', 'in_transit')
+          )
+        ORDER BY estimated_trip_cost ASC, v.name ASC
+      `) as NewTripVehicleCandidateRow[];
 
       candidates.push({
         shipment_id: shipment.shipment_id,
@@ -212,5 +206,84 @@ export class LogisticsDecisionEngineService {
     }
 
     return candidates;
+  }
+
+  static async generateRecommendations(
+    transferRequestId: string,
+    currentUser: CurrentUser,
+  ): Promise<LogisticsDecisionEngineResult> {
+    const candidates = await this.findExistingTripCandidates(
+      transferRequestId,
+      currentUser,
+    );
+
+    const recommendations: LogisticsDecisionRecommendation[] = [];
+
+    for (const candidate of candidates) {
+      if (candidate.trips.length > 0) {
+        const trip = candidate.trips[0];
+
+        recommendations.push({
+          transfer_request_id: transferRequestId,
+          shipment_id: candidate.shipment_id,
+          shipment_number: candidate.shipment_number,
+          decision_type: "add_to_existing_trip",
+          trip_id: trip.trip_id,
+          total_cost: null,
+          cost_breakdown: {
+            estimated_incremental_cost: null,
+            existing_trip_cost: trip.cost,
+          },
+          reasoning: LOGISTICS_DECISION_ENGINE_TEXT.success.available,
+        });
+
+        continue;
+      }
+
+      if (candidate.new_trip_vehicles.length > 0) {
+        const vehicle = candidate.new_trip_vehicles.reduce(
+          (cheapest, current) =>
+            current.estimated_trip_cost < cheapest.estimated_trip_cost
+              ? current
+              : cheapest,
+        );
+
+        recommendations.push({
+          transfer_request_id: transferRequestId,
+          shipment_id: candidate.shipment_id,
+          shipment_number: candidate.shipment_number,
+          decision_type: "create_new_trip",
+          trip_id: null,
+          total_cost: vehicle.estimated_trip_cost,
+          cost_breakdown: {
+            vehicle_id: vehicle.vehicle_id,
+            vehicle_name: vehicle.vehicle_name,
+            distance_km: vehicle.distance_km,
+            fixed_cost: vehicle.fixed_cost,
+            cost_per_km: vehicle.cost_per_km,
+            estimated_trip_cost: vehicle.estimated_trip_cost,
+          },
+          reasoning: LOGISTICS_DECISION_ENGINE_TEXT.success.create_new_trip,
+        });
+
+        continue;
+      }
+
+      recommendations.push({
+        transfer_request_id: transferRequestId,
+        shipment_id: candidate.shipment_id,
+        shipment_number: candidate.shipment_number,
+        decision_type: "defer",
+        trip_id: null,
+        total_cost: null,
+        cost_breakdown: {},
+        reasoning: LOGISTICS_DECISION_ENGINE_TEXT.success.defer,
+      });
+    }
+
+    return {
+      transfer_request_id: transferRequestId,
+      recommendations,
+    };
   }
 }
