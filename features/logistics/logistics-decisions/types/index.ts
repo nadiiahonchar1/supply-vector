@@ -5,6 +5,12 @@ export type LogisticsDecisionType =
 
 export type LogisticsDecisionSource = "system" | "manual";
 
+export type LogisticsDecisionStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "superseded";
+
 export type LogisticsDecision = {
   id: string;
   transfer_request_id: string | null;
@@ -15,6 +21,7 @@ export type LogisticsDecision = {
   cost_breakdown: Record<string, unknown>;
   reasoning: string;
   decision_source: LogisticsDecisionSource;
+  decision_status: LogisticsDecisionStatus | null;
   decided_by: string | null;
   created_at: string;
 };
