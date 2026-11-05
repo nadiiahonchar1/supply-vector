@@ -7,6 +7,7 @@ import type { CurrentUser } from "@/features/auth";
 import type {
   CreateLogisticsDecisionInput,
   LogisticsDecision,
+  LogisticsDecisionRecommendation,
 } from "@/features/logistics";
 
 type LogisticsDecisionRow = LogisticsDecision;
@@ -23,6 +24,7 @@ export class LogisticsDecisionsService {
       SELECT
         id,
         transfer_request_id,
+        shipment_id,
         trip_id,
         decision_type,
         total_cost,
@@ -50,6 +52,7 @@ export class LogisticsDecisionsService {
       SELECT
         id,
         transfer_request_id,
+        shipment_id,
         trip_id,
         decision_type,
         total_cost,
@@ -179,6 +182,7 @@ export class LogisticsDecisionsService {
       RETURNING
         id,
         transfer_request_id,
+        shipment_id,
         trip_id,
         decision_type,
         total_cost,
@@ -190,5 +194,108 @@ export class LogisticsDecisionsService {
     `) as LogisticsDecisionRow[];
 
     return rows[0];
+  }
+  static async createSystemLogisticsDecisions(
+    transferRequestId: string,
+    recommendations: LogisticsDecisionRecommendation[],
+    currentUser: CurrentUser,
+  ): Promise<LogisticsDecision[]> {
+    if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
+      throw new ForbiddenError(
+        LOGISTICS_DECISION_TEXT.error.forbidden_update
+      );
+    }
+
+    if (recommendations.length === 0) {
+      return [];
+    }
+
+    const request = await sql`
+    SELECT id, status
+    FROM transfer_requests
+    WHERE id = ${transferRequestId}
+    LIMIT 1
+  `;
+
+    if (request.length === 0) {
+      throw new ValidationError(
+        LOGISTICS_DECISION_TEXT.error.transfer_request_not_found
+      );
+    }
+
+    if (request[0].status !== "approved") {
+      throw new ValidationError(
+        LOGISTICS_DECISION_TEXT.error.request_not_approved
+      );
+    }
+
+    const invalidRecommendation = recommendations.some(
+      (recommendation) =>
+        recommendation.transfer_request_id !== transferRequestId ||
+        !recommendation.shipment_id,
+    );
+
+    if (invalidRecommendation) {
+      throw new ValidationError(
+        LOGISTICS_DECISION_TEXT.error.transfer_request_not_available
+      );
+    }
+
+    const recommendationsJson = JSON.stringify(
+      recommendations.map((recommendation) => ({
+        shipment_id: recommendation.shipment_id,
+        trip_id: recommendation.trip_id,
+        decision_type: recommendation.decision_type,
+        total_cost: recommendation.total_cost,
+        cost_breakdown: recommendation.cost_breakdown,
+        reasoning: recommendation.reasoning,
+      })),
+    );
+
+    const decisions = await sql`
+    INSERT INTO logistics_decisions (
+      transfer_request_id,
+      shipment_id,
+      trip_id,
+      decision_type,
+      total_cost,
+      cost_breakdown,
+      reasoning,
+      decision_source,
+      decided_by
+    )
+    SELECT
+      ${transferRequestId},
+      recommendation.shipment_id,
+      recommendation.trip_id,
+      recommendation.decision_type,
+      recommendation.total_cost,
+      recommendation.cost_breakdown,
+      recommendation.reasoning,
+      'system',
+      NULL
+    FROM jsonb_to_recordset(${recommendationsJson}::JSONB) AS recommendation(
+      shipment_id UUID,
+      trip_id UUID,
+      decision_type TEXT,
+      total_cost NUMERIC,
+      cost_breakdown JSONB,
+      reasoning TEXT
+    )
+    RETURNING
+      id,
+      transfer_request_id,
+      shipment_id,
+      trip_id,
+      decision_type,
+      total_cost,
+      cost_breakdown,
+      reasoning,
+      decision_source,
+      decided_by,
+      created_at
+  `;
+
+    return decisions as LogisticsDecision[];
   }
 }
