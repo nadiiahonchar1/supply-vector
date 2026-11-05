@@ -8,6 +8,7 @@ export type LogisticsDecisionSource = "system" | "manual";
 export type LogisticsDecision = {
   id: string;
   transfer_request_id: string | null;
+  shipment_id: string | null;
   trip_id: string | null;
   decision_type: LogisticsDecisionType;
   total_cost: number | null;
