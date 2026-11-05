@@ -1,15 +1,15 @@
 import { sql } from "@/db";
 import { PERMISSIONS, hasPermission } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+import { LOGISTICS_DECISION_ENGINE_TEXT } from "@/features/logistics";
 
 import type { CurrentUser } from "@/features/auth";
-import {
-  LOGISTICS_DECISION_ENGINE_TEXT,
-  type LogisticsDecisionEngineResult,
-  type LogisticsDecisionRecommendation,
-  type LogisticsExistingTripCandidate,
-  type LogisticsNewTripVehicleCandidate,
-  type LogisticsTripCandidate,
+import type {
+  LogisticsDecisionEngineResult,
+  LogisticsDecisionRecommendation,
+  LogisticsExistingTripCandidate,
+  LogisticsNewTripVehicleCandidate,
+  LogisticsTripCandidate,
 } from "@/features/logistics";
 
 type TransferRequestRow = {
