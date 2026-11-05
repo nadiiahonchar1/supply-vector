@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
-import { LogisticsDecisionEngineService } from "@/lib/logistics";
+import {
+  LogisticsDecisionEngineService,
+  LogisticsDecisionsService,
+} from "@/lib/logistics";
 
 type Params = {
   params: Promise<{
@@ -28,10 +31,12 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
-export async function POST(_request: Request, { params }: Params) {
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ transferRequestId: string }> },
+) {
   try {
     const currentUser = await requireUser();
-
     const { transferRequestId } = await params;
 
     const result = await LogisticsDecisionEngineService.generateRecommendations(
@@ -40,7 +45,7 @@ export async function POST(_request: Request, { params }: Params) {
     );
 
     const decisions =
-      await LogisticsDecisionEngineService.createSystemLogisticsDecisions(
+      await LogisticsDecisionsService.createSystemLogisticsDecisions(
         transferRequestId,
         result.recommendations,
         currentUser,

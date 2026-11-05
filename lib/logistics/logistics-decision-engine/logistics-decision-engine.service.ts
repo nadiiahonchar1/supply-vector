@@ -10,7 +10,6 @@ import type {
   LogisticsExistingTripCandidate,
   LogisticsNewTripVehicleCandidate,
   LogisticsTripCandidate,
-  LogisticsDecision,
 } from "@/features/logistics";
 
 type TransferRequestRow = {
@@ -286,99 +285,5 @@ export class LogisticsDecisionEngineService {
       transfer_request_id: transferRequestId,
       recommendations,
     };
-  }
-  static async createSystemLogisticsDecisions(
-    transferRequestId: string,
-    recommendations: LogisticsDecisionRecommendation[],
-    currentUser: CurrentUser,
-  ): Promise<LogisticsDecision[]> {
-    if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError(
-        LOGISTICS_DECISION_ENGINE_TEXT.error.forbidden_update,
-      );
-    }
-
-    if (!recommendations.length) {
-      return [];
-    }
-
-    const transferRequestRows = await sql`
-    SELECT
-      id,
-      status
-    FROM transfer_requests
-    WHERE id = ${transferRequestId}
-    LIMIT 1
-  `;
-
-    if (!transferRequestRows.length) {
-      throw new NotFoundError(
-        LOGISTICS_DECISION_ENGINE_TEXT.error.request_not_found,
-      );
-    }
-
-    if (transferRequestRows[0].status !== "approved") {
-      throw new ValidationError(
-        LOGISTICS_DECISION_ENGINE_TEXT.error.transfer_request_not_available,
-      );
-    }
-
-    const hasInvalidRequest = recommendations.some(
-      (recommendation) =>
-        recommendation.transfer_request_id !== transferRequestId,
-    );
-
-    if (hasInvalidRequest) {
-      throw new ValidationError(
-        LOGISTICS_DECISION_ENGINE_TEXT.error.transfer_request_not_available,
-      );
-    }
-
-    const rows = (await sql`
-    INSERT INTO logistics_decisions (
-      transfer_request_id,
-      trip_id,
-      decision_type,
-      total_cost,
-      cost_breakdown,
-      reasoning,
-      decision_source,
-      decided_by,
-      created_at
-    )
-    SELECT
-      recommendation.transfer_request_id,
-      recommendation.trip_id,
-      recommendation.decision_type,
-      recommendation.total_cost,
-      recommendation.cost_breakdown,
-      recommendation.reasoning,
-      'system',
-      NULL,
-      NOW()
-    FROM jsonb_to_recordset(
-      ${JSON.stringify(recommendations)}::JSONB
-    ) AS recommendation(
-      transfer_request_id UUID,
-      trip_id UUID,
-      decision_type TEXT,
-      total_cost NUMERIC,
-      cost_breakdown JSONB,
-      reasoning TEXT
-    )
-    RETURNING
-      id,
-      transfer_request_id,
-      trip_id,
-      decision_type,
-      total_cost,
-      cost_breakdown,
-      reasoning,
-      decision_source,
-      decided_by,
-      created_at
-  `) as LogisticsDecision[];
-
-    return rows;
   }
 }

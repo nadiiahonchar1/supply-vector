@@ -218,8 +218,8 @@ export class LogisticsDecisionsService {
   `;
 
     if (request.length === 0) {
-      throw new ValidationError(
-        LOGISTICS_DECISION_TEXT.error.transfer_request_not_found
+      throw new NotFoundError(
+        LOGISTICS_DECISION_TEXT.error.transfer_request_not_found,
       );
     }
 
