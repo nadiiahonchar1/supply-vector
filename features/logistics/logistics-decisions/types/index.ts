@@ -35,3 +35,48 @@ export type CreateLogisticsDecisionInput = {
   reasoning: string;
   decision_source?: LogisticsDecisionSource;
 };
+
+export type LogisticsDecisionDetails = LogisticsDecision & {
+  shipment: {
+    id: string;
+    shipment_number: string;
+    status: string;
+    source_store: {
+      id: string;
+      name: string;
+      city: string;
+    };
+    destination_store: {
+      id: string;
+      name: string;
+      city: string;
+    };
+    product: {
+      id: string;
+      name: string;
+      sku: string;
+    };
+    quantity: number;
+  } | null;
+
+  transfer_request: {
+    id: string;
+    status: string;
+    priority: string;
+    quantity: number;
+    earliest_delivery: string | null;
+    latest_delivery: string | null;
+  } | null;
+
+  trip: {
+    id: string;
+    status: string;
+    distance_km: number | null;
+    cost: number | null;
+    vehicle: {
+      id: string;
+      name: string;
+      type: string;
+    };
+  } | null;
+};
