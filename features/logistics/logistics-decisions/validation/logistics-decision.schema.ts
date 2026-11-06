@@ -12,5 +12,8 @@ export const createLogisticsDecisionSchema = z.object({
   cost_breakdown: z.record(z.string(), z.unknown()).optional(),
 
   reasoning: z.string().min(1),
+});
 
+export const updateLogisticsDecisionStatusSchema = z.object({
+  decision_status: z.enum(["accepted", "rejected"]),
 });
