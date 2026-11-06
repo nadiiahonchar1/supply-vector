@@ -375,39 +375,156 @@ export class LogisticsDecisionsService {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
 
-    const rows = (await sql`
-    UPDATE logistics_decisions
-    SET decision_status = ${status}
-    WHERE id = ${id}
-      AND decision_source = 'system'
-      AND decision_status = 'pending'
-    RETURNING
-      id,
-      transfer_request_id,
-      shipment_id,
-      trip_id,
-      decision_type,
-      total_cost,
-      cost_breakdown,
-      reasoning,
-      decision_source,
-      decision_status,
-      decided_by,
-      created_at
-  `) as LogisticsDecisionRow[];
-
-    if (rows.length === 0) {
-      const existingRows = await sql`
-      SELECT id
+    const existingRows = await sql`
+      SELECT
+        id,
+        decision_source,
+        decision_status,
+        decision_type
       FROM logistics_decisions
       WHERE id = ${id}
       LIMIT 1
     `;
 
-      if (existingRows.length === 0) {
-        throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
-      }
+    if (existingRows.length === 0) {
+      throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
+    }
 
+    const existingDecision = existingRows[0];
+
+    if (
+      existingDecision.decision_source !== "system" ||
+      existingDecision.decision_status !== "pending"
+    ) {
+      throw new ValidationError(
+        LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+      );
+    }
+
+    if (
+      status === "accepted" &&
+      existingDecision.decision_type === "create_new_trip" &&
+      !hasPermission(currentUser.role, PERMISSIONS.TRIP_CREATE)
+    ) {
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_create);
+    }
+
+    if (status === "accepted") {
+      try {
+        const rows = (await sql`
+          SELECT *
+          FROM accept_logistics_decision(
+            ${id}::UUID,
+            ${currentUser.id}::UUID
+          )
+        `) as LogisticsDecisionRow[];
+
+        if (rows.length === 0) {
+          throw new ValidationError(
+            LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+          );
+        }
+
+        return rows[0];
+      } catch (error) {
+        if (
+          error instanceof NotFoundError ||
+          error instanceof ValidationError
+        ) {
+          throw error;
+        }
+
+        const message = error instanceof Error ? error.message : "";
+
+        if (message.includes("LOGISTICS_DECISION_NOT_FOUND")) {
+          throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
+        }
+
+        if (message.includes("LOGISTICS_DECISION_NOT_AVAILABLE")) {
+          throw new ValidationError(
+            LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+          );
+        }
+
+        const validationErrors: Record<string, string> = {
+          LOGISTICS_DECISION_INVALID:
+            LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
+
+          LOGISTICS_SHIPMENT_NOT_AVAILABLE:
+            LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
+
+          LOGISTICS_REQUEST_NOT_AVAILABLE:
+            LOGISTICS_DECISION_TEXT.error.request_not_approved,
+
+          LOGISTICS_SHIPMENT_ALREADY_ASSIGNED:
+            LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
+
+          LOGISTICS_TRIP_REQUIRED: LOGISTICS_DECISION_TEXT.error.trip_required,
+
+          LOGISTICS_TRIP_NOT_AVAILABLE:
+            LOGISTICS_DECISION_TEXT.error.trip_not_available,
+
+          LOGISTICS_TRIP_STOPS_NOT_AVAILABLE:
+            LOGISTICS_DECISION_TEXT.error.trip_not_available,
+
+          LOGISTICS_TRIP_NOT_ALLOWED:
+            LOGISTICS_DECISION_TEXT.error.trip_not_allowed,
+
+          LOGISTICS_VEHICLE_REQUIRED:
+            LOGISTICS_DECISION_TEXT.error.trip_required,
+
+          LOGISTICS_VEHICLE_NOT_AVAILABLE:
+            LOGISTICS_DECISION_TEXT.error.trip_not_available,
+
+          LOGISTICS_VEHICLE_ALREADY_ASSIGNED:
+            LOGISTICS_DECISION_TEXT.error.trip_not_available,
+
+          LOGISTICS_TRIP_ITEM_NOT_CREATED:
+            LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
+
+          LOGISTICS_DECISION_TYPE_INVALID:
+            LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
+
+          TRIP_CAPACITY_EXCEEDED:
+            LOGISTICS_DECISION_TEXT.error.trip_not_available,
+        };
+
+        const matchedError = Object.entries(validationErrors).find(([code]) =>
+          message.includes(code),
+        );
+
+        if (matchedError) {
+          throw new ValidationError(matchedError[1]);
+        }
+
+        throw error;
+      }
+    }
+
+    const rows = (await sql`
+      UPDATE logistics_decisions
+      SET
+        decision_status = 'rejected',
+        decided_by = ${currentUser.id}
+      WHERE id = ${id}
+        AND decision_source = 'system'
+        AND decision_status = 'pending'
+      RETURNING
+        id,
+        transfer_request_id,
+        shipment_id,
+        trip_id,
+        decision_type,
+        total_cost,
+        cost_breakdown,
+        reasoning,
+        decision_source,
+        decision_status,
+        decided_by,
+        created_at
+    `) as LogisticsDecisionRow[];
+
+    if (rows.length === 0) {
       throw new ValidationError(
         LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
       );
