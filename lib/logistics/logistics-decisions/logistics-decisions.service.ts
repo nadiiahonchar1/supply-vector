@@ -31,6 +31,7 @@ export class LogisticsDecisionsService {
         cost_breakdown,
         reasoning,
         decision_source,
+        decision_status,
         decided_by,
         created_at
       FROM logistics_decisions
@@ -59,6 +60,7 @@ export class LogisticsDecisionsService {
         cost_breakdown,
         reasoning,
         decision_source,
+        decision_status,
         decided_by,
         created_at
       FROM logistics_decisions
@@ -189,6 +191,7 @@ export class LogisticsDecisionsService {
         cost_breakdown,
         reasoning,
         decision_source,
+        decision_status,
         decided_by,
         created_at
     `) as LogisticsDecisionRow[];
@@ -262,6 +265,7 @@ export class LogisticsDecisionsService {
       cost_breakdown,
       reasoning,
       decision_source,
+      decision_status,
       decided_by
     )
     SELECT
@@ -273,6 +277,7 @@ export class LogisticsDecisionsService {
       recommendation.cost_breakdown,
       recommendation.reasoning,
       'system',
+      'pending',
       NULL
     FROM jsonb_to_recordset(${recommendationsJson}::JSONB) AS recommendation(
       shipment_id UUID,
@@ -292,6 +297,7 @@ export class LogisticsDecisionsService {
       cost_breakdown,
       reasoning,
       decision_source,
+      decision_status,
       decided_by,
       created_at
   `;
