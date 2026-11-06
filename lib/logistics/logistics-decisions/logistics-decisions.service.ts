@@ -199,6 +199,7 @@ export class LogisticsDecisionsService {
 
     return rows[0];
   }
+
   static async createSystemLogisticsDecisions(
     transferRequestId: string,
     recommendations: LogisticsDecisionRecommendation[],
@@ -206,10 +207,6 @@ export class LogisticsDecisionsService {
   ): Promise<LogisticsDecision[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
-    }
-
-    if (recommendations.length === 0) {
-      return [];
     }
 
     const request = await sql`
@@ -254,54 +251,119 @@ export class LogisticsDecisionsService {
       })),
     );
 
-    const decisions = await sql`
-    INSERT INTO logistics_decisions (
-      transfer_request_id,
-      shipment_id,
-      trip_id,
-      decision_type,
-      total_cost,
-      cost_breakdown,
-      reasoning,
-      decision_source,
-      decision_status,
-      decided_by
-    )
-    SELECT
-      ${transferRequestId},
-      recommendation.shipment_id,
-      recommendation.trip_id,
-      recommendation.decision_type,
-      recommendation.total_cost,
-      recommendation.cost_breakdown,
-      recommendation.reasoning,
-      'system',
-      'pending',
-      NULL
-    FROM jsonb_to_recordset(${recommendationsJson}::JSONB) AS recommendation(
-      shipment_id UUID,
-      trip_id UUID,
-      decision_type TEXT,
-      total_cost NUMERIC,
-      cost_breakdown JSONB,
-      reasoning TEXT
-    )
-    RETURNING
-      id,
-      transfer_request_id,
-      shipment_id,
-      trip_id,
-      decision_type,
-      total_cost,
-      cost_breakdown,
-      reasoning,
-      decision_source,
-      decision_status,
-      decided_by,
-      created_at
-  `;
+    const transactionResults = await sql.transaction([
+      sql`
+      SELECT pg_advisory_xact_lock(
+        hashtext(${transferRequestId})
+      )
+    `,
 
-    return decisions as LogisticsDecision[];
+      sql`
+      UPDATE logistics_decisions AS current_decision
+      SET decision_status = 'superseded'
+      WHERE current_decision.transfer_request_id = ${transferRequestId}
+        AND current_decision.decision_source = 'system'
+        AND current_decision.decision_status = 'pending'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jsonb_to_recordset(
+            ${recommendationsJson}::JSONB
+          ) AS recommendation(
+            shipment_id UUID,
+            trip_id UUID,
+            decision_type TEXT,
+            total_cost NUMERIC,
+            cost_breakdown JSONB,
+            reasoning TEXT
+          )
+          WHERE recommendation.shipment_id =
+            current_decision.shipment_id
+            AND recommendation.trip_id IS NOT DISTINCT FROM
+              current_decision.trip_id
+            AND recommendation.decision_type =
+              current_decision.decision_type
+            AND recommendation.total_cost IS NOT DISTINCT FROM
+              current_decision.total_cost
+            AND recommendation.cost_breakdown =
+              current_decision.cost_breakdown
+            AND recommendation.reasoning =
+              current_decision.reasoning
+        )
+    `,
+
+      sql`
+      INSERT INTO logistics_decisions (
+        transfer_request_id,
+        shipment_id,
+        trip_id,
+        decision_type,
+        total_cost,
+        cost_breakdown,
+        reasoning,
+        decision_source,
+        decision_status,
+        decided_by
+      )
+      SELECT
+        ${transferRequestId},
+        recommendation.shipment_id,
+        recommendation.trip_id,
+        recommendation.decision_type,
+        recommendation.total_cost,
+        recommendation.cost_breakdown,
+        recommendation.reasoning,
+        'system',
+        'pending',
+        NULL
+      FROM jsonb_to_recordset(
+        ${recommendationsJson}::JSONB
+      ) AS recommendation(
+        shipment_id UUID,
+        trip_id UUID,
+        decision_type TEXT,
+        total_cost NUMERIC,
+        cost_breakdown JSONB,
+        reasoning TEXT
+      )
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM logistics_decisions AS existing
+        WHERE existing.transfer_request_id = ${transferRequestId}
+          AND existing.shipment_id = recommendation.shipment_id
+          AND existing.decision_source = 'system'
+          AND existing.decision_status = 'pending'
+      )
+      ON CONFLICT (transfer_request_id, shipment_id)
+      WHERE decision_source = 'system'
+        AND decision_status = 'pending'
+      DO NOTHING
+    `,
+
+      sql`
+      SELECT
+        id,
+        transfer_request_id,
+        shipment_id,
+        trip_id,
+        decision_type,
+        total_cost,
+        cost_breakdown,
+        reasoning,
+        decision_source,
+        decision_status,
+        decided_by,
+        created_at
+      FROM logistics_decisions
+      WHERE transfer_request_id = ${transferRequestId}
+        AND decision_source = 'system'
+        AND decision_status = 'pending'
+      ORDER BY created_at DESC
+    `,
+    ]);
+
+    const decisions = transactionResults[3] as LogisticsDecisionRow[];
+
+    return decisions;
   }
 
   static async updateSystemDecisionStatus(
