@@ -8,6 +8,7 @@ import type {
   CreateLogisticsDecisionInput,
   LogisticsDecision,
   LogisticsDecisionRecommendation,
+  LogisticsDecisionStatus,
 } from "@/features/logistics";
 
 type LogisticsDecisionRow = LogisticsDecision;
@@ -204,9 +205,7 @@ export class LogisticsDecisionsService {
     currentUser: CurrentUser,
   ): Promise<LogisticsDecision[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
-      throw new ForbiddenError(
-        LOGISTICS_DECISION_TEXT.error.forbidden_update
-      );
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
 
     if (recommendations.length === 0) {
@@ -228,7 +227,7 @@ export class LogisticsDecisionsService {
 
     if (request[0].status !== "approved") {
       throw new ValidationError(
-        LOGISTICS_DECISION_TEXT.error.request_not_approved
+        LOGISTICS_DECISION_TEXT.error.request_not_approved,
       );
     }
 
@@ -240,7 +239,7 @@ export class LogisticsDecisionsService {
 
     if (invalidRecommendation) {
       throw new ValidationError(
-        LOGISTICS_DECISION_TEXT.error.transfer_request_not_available
+        LOGISTICS_DECISION_TEXT.error.transfer_request_not_available,
       );
     }
 
@@ -303,5 +302,55 @@ export class LogisticsDecisionsService {
   `;
 
     return decisions as LogisticsDecision[];
+  }
+
+  static async updateSystemDecisionStatus(
+    id: string,
+    status: Extract<LogisticsDecisionStatus, "accepted" | "rejected">,
+    currentUser: CurrentUser,
+  ): Promise<LogisticsDecision> {
+    if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
+      throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
+    }
+
+    const rows = (await sql`
+    UPDATE logistics_decisions
+    SET decision_status = ${status}
+    WHERE id = ${id}
+      AND decision_source = 'system'
+      AND decision_status = 'pending'
+    RETURNING
+      id,
+      transfer_request_id,
+      shipment_id,
+      trip_id,
+      decision_type,
+      total_cost,
+      cost_breakdown,
+      reasoning,
+      decision_source,
+      decision_status,
+      decided_by,
+      created_at
+  `) as LogisticsDecisionRow[];
+
+    if (rows.length === 0) {
+      const existingRows = await sql`
+      SELECT id
+      FROM logistics_decisions
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+      if (existingRows.length === 0) {
+        throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
+      }
+
+      throw new ValidationError(
+        LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+      );
+    }
+
+    return rows[0];
   }
 }

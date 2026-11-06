@@ -15,6 +15,8 @@ export const LOGISTICS_DECISION_TEXT = {
     forbidden_update: "Недостатньо прав для зміни логістичних рішень",
     forbidden_create: "Недостатньо прав для створення логістичного рішення",
     request_not_approved: "Заявка на переміщення ще не підтверджена.",
+    decision_status_not_available:
+      "Статус логістичної рекомендації вже змінено або її не можна змінити",
   },
 
   success: {
