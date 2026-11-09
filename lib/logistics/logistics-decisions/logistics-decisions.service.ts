@@ -368,7 +368,7 @@ export class LogisticsDecisionsService {
     transferRequestId: string,
     recommendations: LogisticsDecisionRecommendation[],
     currentUser: CurrentUser,
-  ): Promise<LogisticsDecision[]> {
+  ): Promise<LogisticsDecisionDetails[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
@@ -527,7 +527,11 @@ export class LogisticsDecisionsService {
 
     const decisions = transactionResults[3] as LogisticsDecisionRow[];
 
-    return decisions;
+    return Promise.all(
+      decisions.map((decision) =>
+        this.getLogisticsDecisionById(decision.id, currentUser),
+      ),
+    );
   }
 
   static async updateSystemDecisionStatus(
