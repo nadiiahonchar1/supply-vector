@@ -84,7 +84,10 @@ export class LogisticsDecisionEngineService {
           - COALESCE((
             SELECT SUM(ti.quantity)
             FROM trip_items ti
+            JOIN trips t
+              ON t.id = ti.trip_id
             WHERE ti.shipment_id = s.id
+              AND t.status <> 'cancelled'
           ), 0)
         )::INTEGER AS remaining_quantity
       FROM shipments s
@@ -98,7 +101,10 @@ export class LogisticsDecisionEngineService {
         - COALESCE((
           SELECT SUM(ti.quantity)
           FROM trip_items ti
+          JOIN trips t
+            ON t.id = ti.trip_id
           WHERE ti.shipment_id = s.id
+            AND t.status <> 'cancelled'
         ), 0) > 0
       ORDER BY s.created_at ASC
     `) as ShipmentCandidateRow[];
