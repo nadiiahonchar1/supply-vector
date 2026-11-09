@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth/server";
 import { handleApiError } from "@/lib/errors";
 import { LogisticsDecisionsService } from "@/lib/logistics";
 import { updateLogisticsDecisionStatusSchema } from "@/features/logistics";
-import { AuditService } from "@/lib/audit";
 import { validate } from "@/lib/validation";
 
 type RouteContext = {
@@ -45,20 +44,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       input.decision_status,
       currentUser,
     );
-
-   if (decision.decision_status === "rejected") {
-     await AuditService.log({
-       userId: currentUser.id,
-       action: "trip:update",
-       entity: "logistics_decision",
-       entityId: decision.id,
-       meta: {
-         decision_status: decision.decision_status,
-         decision_type: decision.decision_type,
-         shipment_id: decision.shipment_id,
-       },
-     });
-   }
 
     return NextResponse.json(decision);
   } catch (error) {

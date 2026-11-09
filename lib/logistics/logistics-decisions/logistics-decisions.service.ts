@@ -544,15 +544,15 @@ export class LogisticsDecisionsService {
     }
 
     const existingRows = await sql`
-      SELECT
-        id,
-        decision_source,
-        decision_status,
-        decision_type
-      FROM logistics_decisions
-      WHERE id = ${id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      decision_source,
+      decision_status,
+      decision_type
+    FROM logistics_decisions
+    WHERE id = ${id}
+    LIMIT 1
+  `;
 
     if (existingRows.length === 0) {
       throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
@@ -580,12 +580,12 @@ export class LogisticsDecisionsService {
     if (status === "accepted") {
       try {
         const rows = (await sql`
-          SELECT *
-          FROM accept_logistics_decision(
-            ${id}::UUID,
-            ${currentUser.id}::UUID
-          )
-        `) as LogisticsDecisionRow[];
+        SELECT *
+        FROM accept_logistics_decision(
+          ${id}::UUID,
+          ${currentUser.id}::UUID
+        )
+      `) as LogisticsDecisionRow[];
 
         if (rows.length === 0) {
           throw new ValidationError(
@@ -669,35 +669,40 @@ export class LogisticsDecisionsService {
       }
     }
 
-    const rows = (await sql`
-      UPDATE logistics_decisions
-      SET
-        decision_status = 'rejected',
-        decided_by = ${currentUser.id}
-      WHERE id = ${id}
-        AND decision_source = 'system'
-        AND decision_status = 'pending'
-      RETURNING
-        id,
-        transfer_request_id,
-        shipment_id,
-        trip_id,
-        decision_type,
-        total_cost,
-        cost_breakdown,
-        reasoning,
-        decision_source,
-        decision_status,
-        decided_by,
-        created_at
+    try {
+      const rows = (await sql`
+      SELECT *
+      FROM reject_logistics_decision(
+        ${id}::UUID,
+        ${currentUser.id}::UUID
+      )
     `) as LogisticsDecisionRow[];
 
-    if (rows.length === 0) {
-      throw new ValidationError(
-        LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
-      );
-    }
+      if (rows.length === 0) {
+        throw new ValidationError(
+          LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+        );
+      }
 
-    return this.getLogisticsDecisionById(rows[0].id, currentUser);
+      return this.getLogisticsDecisionById(rows[0].id, currentUser);
+    } catch (error) {
+      if (error instanceof NotFoundError || error instanceof ValidationError) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : "";
+
+      if (message.includes("LOGISTICS_DECISION_NOT_FOUND")) {
+        throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);
+      }
+
+      if (message.includes("LOGISTICS_DECISION_NOT_AVAILABLE")) {
+        throw new ValidationError(
+          LOGISTICS_DECISION_TEXT.error.decision_status_not_available,
+        );
+      }
+
+      throw error;
+    }
   }
 }
