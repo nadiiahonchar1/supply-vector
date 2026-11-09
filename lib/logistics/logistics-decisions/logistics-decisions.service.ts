@@ -9,35 +9,118 @@ import type {
   LogisticsDecision,
   LogisticsDecisionRecommendation,
   LogisticsDecisionStatus,
+  LogisticsDecisionDetails,
 } from "@/features/logistics";
 
 type LogisticsDecisionRow = LogisticsDecision;
+type LogisticsDecisionDetailsRow = LogisticsDecisionDetails;
 
 export class LogisticsDecisionsService {
   static async getLogisticsDecisions(
     currentUser: CurrentUser,
-  ): Promise<LogisticsDecision[]> {
+  ): Promise<LogisticsDecisionDetails[]> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
-      SELECT
-        id,
-        transfer_request_id,
-        shipment_id,
-        trip_id,
-        decision_type,
-        total_cost,
-        cost_breakdown,
-        reasoning,
-        decision_source,
-        decision_status,
-        decided_by,
-        created_at
-      FROM logistics_decisions
-      ORDER BY created_at DESC
-    `) as LogisticsDecisionRow[];
+    SELECT
+      ld.id,
+      ld.transfer_request_id,
+      ld.shipment_id,
+      ld.trip_id,
+      ld.decision_type,
+      ld.total_cost,
+      ld.cost_breakdown,
+      ld.reasoning,
+      ld.decision_source,
+      ld.decision_status,
+      ld.decided_by,
+      ld.created_at,
+
+      CASE
+        WHEN s.id IS NOT NULL THEN jsonb_build_object(
+          'id', s.id,
+          'shipment_number', s.shipment_number,
+          'status', s.status,
+          'source_store', jsonb_build_object(
+            'id', source_store.id,
+            'name', source_store.name,
+            'city', source_store.city
+          ),
+          'destination_store', jsonb_build_object(
+            'id', destination_store.id,
+            'name', destination_store.name,
+            'city', destination_store.city
+          ),
+          'product', CASE
+            WHEN p.id IS NOT NULL THEN jsonb_build_object(
+              'id', p.id,
+              'name', p.name,
+              'sku', p.sku
+            )
+            ELSE NULL
+          END,
+          'quantity', si.quantity
+        )
+        ELSE NULL
+      END AS shipment,
+
+      CASE
+        WHEN tr.id IS NOT NULL THEN jsonb_build_object(
+          'id', tr.id,
+          'status', tr.status,
+          'priority', tr.priority,
+          'quantity', tr.quantity,
+          'earliest_delivery', tr.earliest_delivery,
+          'latest_delivery', tr.latest_delivery
+        )
+        ELSE NULL
+      END AS transfer_request,
+
+      CASE
+        WHEN t.id IS NOT NULL THEN jsonb_build_object(
+          'id', t.id,
+          'status', t.status,
+          'distance_km', t.distance_km,
+          'cost', t.cost,
+          'vehicle', jsonb_build_object(
+            'id', v.id,
+            'name', v.name,
+            'type', v.type
+          )
+        )
+        ELSE NULL
+      END AS trip
+
+    FROM logistics_decisions ld
+
+    LEFT JOIN shipments s
+      ON s.id = ld.shipment_id
+
+    LEFT JOIN shipment_items si
+      ON si.shipment_id = s.id
+
+    LEFT JOIN products p
+      ON p.id = si.product_id
+
+    LEFT JOIN stores source_store
+      ON source_store.id = s.source_store_id
+
+    LEFT JOIN stores destination_store
+      ON destination_store.id = s.destination_store_id
+
+    LEFT JOIN transfer_requests tr
+      ON tr.id = ld.transfer_request_id
+
+    LEFT JOIN trips t
+      ON t.id = ld.trip_id
+
+    LEFT JOIN vehicles v
+      ON v.id = t.vehicle_id
+
+    ORDER BY ld.created_at DESC
+  `) as LogisticsDecisionDetailsRow[];
 
     return rows;
   }
@@ -45,29 +128,110 @@ export class LogisticsDecisionsService {
   static async getLogisticsDecisionById(
     id: string,
     currentUser: CurrentUser,
-  ): Promise<LogisticsDecision> {
+  ): Promise<LogisticsDecisionDetails> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
-      SELECT
-        id,
-        transfer_request_id,
-        shipment_id,
-        trip_id,
-        decision_type,
-        total_cost,
-        cost_breakdown,
-        reasoning,
-        decision_source,
-        decision_status,
-        decided_by,
-        created_at
-      FROM logistics_decisions
-      WHERE id = ${id}
-      LIMIT 1
-    `) as LogisticsDecisionRow[];
+    SELECT
+      ld.id,
+      ld.transfer_request_id,
+      ld.shipment_id,
+      ld.trip_id,
+      ld.decision_type,
+      ld.total_cost,
+      ld.cost_breakdown,
+      ld.reasoning,
+      ld.decision_source,
+      ld.decision_status,
+      ld.decided_by,
+      ld.created_at,
+
+      CASE
+        WHEN s.id IS NOT NULL THEN jsonb_build_object(
+          'id', s.id,
+          'shipment_number', s.shipment_number,
+          'status', s.status,
+          'source_store', jsonb_build_object(
+            'id', source_store.id,
+            'name', source_store.name,
+            'city', source_store.city
+          ),
+          'destination_store', jsonb_build_object(
+            'id', destination_store.id,
+            'name', destination_store.name,
+            'city', destination_store.city
+          ),
+          'product', CASE
+            WHEN p.id IS NOT NULL THEN jsonb_build_object(
+              'id', p.id,
+              'name', p.name,
+              'sku', p.sku
+            )
+            ELSE NULL
+          END,
+          'quantity', si.quantity
+        )
+        ELSE NULL
+      END AS shipment,
+
+      CASE
+        WHEN tr.id IS NOT NULL THEN jsonb_build_object(
+          'id', tr.id,
+          'status', tr.status,
+          'priority', tr.priority,
+          'quantity', tr.quantity,
+          'earliest_delivery', tr.earliest_delivery,
+          'latest_delivery', tr.latest_delivery
+        )
+        ELSE NULL
+      END AS transfer_request,
+
+      CASE
+        WHEN t.id IS NOT NULL THEN jsonb_build_object(
+          'id', t.id,
+          'status', t.status,
+          'distance_km', t.distance_km,
+          'cost', t.cost,
+          'vehicle', jsonb_build_object(
+            'id', v.id,
+            'name', v.name,
+            'type', v.type
+          )
+        )
+        ELSE NULL
+      END AS trip
+
+    FROM logistics_decisions ld
+
+    LEFT JOIN shipments s
+      ON s.id = ld.shipment_id
+
+    LEFT JOIN shipment_items si
+      ON si.shipment_id = s.id
+
+    LEFT JOIN products p
+      ON p.id = si.product_id
+
+    LEFT JOIN stores source_store
+      ON source_store.id = s.source_store_id
+
+    LEFT JOIN stores destination_store
+      ON destination_store.id = s.destination_store_id
+
+    LEFT JOIN transfer_requests tr
+      ON tr.id = ld.transfer_request_id
+
+    LEFT JOIN trips t
+      ON t.id = ld.trip_id
+
+    LEFT JOIN vehicles v
+      ON v.id = t.vehicle_id
+
+    WHERE ld.id = ${id}
+    LIMIT 1
+  `) as LogisticsDecisionDetailsRow[];
 
     if (!rows.length) {
       throw new NotFoundError(LOGISTICS_DECISION_TEXT.error.empty_decision);

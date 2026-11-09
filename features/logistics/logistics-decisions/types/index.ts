@@ -55,8 +55,8 @@ export type LogisticsDecisionDetails = LogisticsDecision & {
       id: string;
       name: string;
       sku: string;
-    };
-    quantity: number;
+    } | null;
+    quantity: number | null;
   } | null;
 
   transfer_request: {
