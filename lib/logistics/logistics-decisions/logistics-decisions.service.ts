@@ -243,7 +243,7 @@ export class LogisticsDecisionsService {
   static async createLogisticsDecision(
     data: CreateLogisticsDecisionInput,
     currentUser: CurrentUser,
-  ): Promise<LogisticsDecision> {
+  ): Promise<LogisticsDecisionDetails> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
@@ -361,7 +361,7 @@ export class LogisticsDecisionsService {
         created_at
     `) as LogisticsDecisionRow[];
 
-    return rows[0];
+    return this.getLogisticsDecisionById(rows[0].id, currentUser);
   }
 
   static async createSystemLogisticsDecisions(
@@ -534,7 +534,7 @@ export class LogisticsDecisionsService {
     id: string,
     status: Extract<LogisticsDecisionStatus, "accepted" | "rejected">,
     currentUser: CurrentUser,
-  ): Promise<LogisticsDecision> {
+  ): Promise<LogisticsDecisionDetails> {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_UPDATE)) {
       throw new ForbiddenError(LOGISTICS_DECISION_TEXT.error.forbidden_update);
     }
@@ -589,7 +589,7 @@ export class LogisticsDecisionsService {
           );
         }
 
-        return rows[0];
+        return this.getLogisticsDecisionById(rows[0].id, currentUser);
       } catch (error) {
         if (
           error instanceof NotFoundError ||
@@ -694,6 +694,6 @@ export class LogisticsDecisionsService {
       );
     }
 
-    return rows[0];
+    return this.getLogisticsDecisionById(rows[0].id, currentUser);
   }
 }
