@@ -284,8 +284,9 @@ export class LogisticsDecisionsService {
       }
 
       if (
-        tripRows[0].status === "delivered" ||
-        tripRows[0].status === "cancelled"
+        data.decision_type === "add_to_existing_trip" &&
+        tripRows[0].status !== "planned" &&
+        tripRows[0].status !== "ready"
       ) {
         throw new ValidationError(
           LOGISTICS_DECISION_TEXT.error.trip_not_available,
