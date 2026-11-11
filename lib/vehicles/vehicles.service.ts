@@ -216,6 +216,19 @@ export class VehiclesService {
       data.is_active !== undefined ? data.is_active : existing.is_active;
 
     validateAvailability(availableFrom, availableTo);
+    if (existing.is_active && !isActive) {
+      const activeTripRows = await sql`
+      SELECT id
+      FROM trips
+      WHERE vehicle_id = ${id}
+        AND status IN ('ready', 'in_transit')
+      LIMIT 1
+    `;
+
+      if (activeTripRows.length) {
+        throw new ValidationError(VEHICLE_TEXT.error.vehicle_has_active_trip);
+      }
+    }
 
     const rows = (await sql`
       UPDATE vehicles
