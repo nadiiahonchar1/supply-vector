@@ -193,6 +193,17 @@ export class TripsService {
 
     const nextStatus = data.status ?? trip.status;
 
+    if (
+      trip.status === "in_transit" &&
+      (nextStatus !== "delivered" ||
+        data.departure_at !== undefined ||
+        data.expected_arrival_at !== undefined ||
+        data.distance_km !== undefined ||
+        data.cost !== undefined)
+    ) {
+      throw new ValidationError(TRIP_TEXT.error.invalid_status_transition);
+    }
+
     this.validateStatusTransition(trip.status, nextStatus);
 
     const nextDeparture =
