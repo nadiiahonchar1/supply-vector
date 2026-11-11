@@ -92,15 +92,18 @@ export class TripsService {
     }
 
     const vehicleRows = await sql`
-    SELECT id
+    SELECT id, is_active
     FROM vehicles
     WHERE id = ${data.vehicle_id}
-      AND is_active = TRUE
     LIMIT 1
   `;
 
     if (!vehicleRows.length) {
       throw new NotFoundError(TRIP_TEXT.error.vehicle_not_found);
+    }
+
+    if (!vehicleRows[0].is_active) {
+      throw new ValidationError(TRIP_TEXT.error.vehicle_inactive);
     }
 
     const storeRows = await sql`
@@ -229,14 +232,29 @@ export class TripsService {
     }
 
     if (nextStatus === "ready" || nextStatus === "in_transit") {
+      const vehicleRows = await sql`
+      SELECT is_active
+      FROM vehicles
+      WHERE id = ${trip.vehicle_id}
+      LIMIT 1
+    `;
+
+      if (!vehicleRows.length) {
+        throw new NotFoundError(TRIP_TEXT.error.vehicle_not_found);
+      }
+
+      if (!vehicleRows[0].is_active) {
+        throw new ValidationError(TRIP_TEXT.error.vehicle_inactive);
+      }
+
       const activeTripRows = await sql`
-    SELECT id
-    FROM trips
-    WHERE vehicle_id = ${trip.vehicle_id}
-      AND status IN ('ready', 'in_transit')
-      AND id <> ${id}
-    LIMIT 1
-  `;
+      SELECT id
+      FROM trips
+      WHERE vehicle_id = ${trip.vehicle_id}
+        AND status IN ('ready', 'in_transit')
+        AND id <> ${id}
+      LIMIT 1
+    `;
 
       if (activeTripRows.length) {
         throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
