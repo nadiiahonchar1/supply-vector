@@ -320,9 +320,9 @@ export class LogisticsDecisionsService {
       );
     }
 
-    const decisionSource = data.decision_source ?? "manual";
+    const decisionSource = "manual";
 
-    const decidedBy = decisionSource === "manual" ? currentUser.id : null;
+    const decidedBy = currentUser.id;
 
     const rows = (await sql`
       INSERT INTO logistics_decisions (
