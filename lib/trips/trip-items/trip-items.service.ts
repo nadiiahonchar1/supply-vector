@@ -86,7 +86,7 @@ export class TripItemsService {
 
     const trip = tripRows[0];
 
-    if (["delivered", "cancelled"].includes(trip.status)) {
+    if (!["planned", "ready"].includes(trip.status)) {
       throw new ValidationError(TRIP_ITEM_TEXT.error.trip_not_modifiable);
     }
 
@@ -213,7 +213,7 @@ export class TripItemsService {
       throw new NotFoundError(TRIP_ITEM_TEXT.error.trip_not_found);
     }
 
-    if (["delivered", "cancelled"].includes(tripRows[0].status)) {
+    if (!["planned", "ready"].includes(tripRows[0].status)) {
       throw new ValidationError(TRIP_ITEM_TEXT.error.trip_not_modifiable);
     }
 
