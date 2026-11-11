@@ -77,7 +77,10 @@ export class LogisticsDecisionEngineService {
         COALESCE((
           SELECT SUM(ti.quantity)
           FROM trip_items ti
+          JOIN trips t
+            ON t.id = ti.trip_id
           WHERE ti.shipment_id = s.id
+            AND t.status <> 'cancelled'
         ), 0)::INTEGER AS assigned_quantity,
         (
           COALESCE(SUM(si.quantity), 0)
