@@ -98,10 +98,7 @@ export class TripStopsService {
       throw new NotFoundError(TRIP_STOP_TEXT.error.trip_not_found);
     }
 
-    if (
-      tripRows[0].status === "delivered" ||
-      tripRows[0].status === "cancelled"
-    ) {
+    if (!["planned", "ready"].includes(tripRows[0].status)) {
       throw new ValidationError(TRIP_STOP_TEXT.error.trip_not_modifiable);
     }
 
@@ -210,9 +207,14 @@ export class TripStopsService {
       throw new NotFoundError(TRIP_STOP_TEXT.error.trip_not_found);
     }
 
+    if (!["planned", "ready", "in_transit"].includes(tripRows[0].status)) {
+      throw new ValidationError(TRIP_STOP_TEXT.error.trip_not_modifiable);
+    }
+
     if (
-      tripRows[0].status === "delivered" ||
-      tripRows[0].status === "cancelled"
+      tripRows[0].status === "in_transit" &&
+      data.sequence !== undefined &&
+      data.sequence !== tripStop.sequence
     ) {
       throw new ValidationError(TRIP_STOP_TEXT.error.trip_not_modifiable);
     }
@@ -320,10 +322,7 @@ export class TripStopsService {
       throw new NotFoundError(TRIP_STOP_TEXT.error.trip_not_found);
     }
 
-    if (
-      tripRows[0].status === "delivered" ||
-      tripRows[0].status === "cancelled"
-    ) {
+    if (!["planned", "ready"].includes(tripRows[0].status)) {
       throw new ValidationError(TRIP_STOP_TEXT.error.trip_not_modifiable);
     }
 
