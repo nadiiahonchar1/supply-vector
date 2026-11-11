@@ -34,10 +34,7 @@ export async function POST(request: NextRequest) {
     );
 
     const decision = await LogisticsDecisionsService.createLogisticsDecision(
-      {
-        ...input,
-        decision_source: "manual",
-      },
+      input,
       currentUser,
     );
 
