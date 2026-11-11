@@ -33,7 +33,6 @@ export type CreateLogisticsDecisionInput = {
   total_cost?: number | null;
   cost_breakdown?: Record<string, unknown>;
   reasoning: string;
-  decision_source?: LogisticsDecisionSource;
 };
 
 export type LogisticsDecisionDetails = LogisticsDecision & {
