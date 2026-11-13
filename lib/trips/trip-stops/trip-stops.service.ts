@@ -176,17 +176,17 @@ export class TripStopsService {
     }
 
     const tripStopRows = (await sql`
-      SELECT
-        id,
-        trip_id,
-        store_id,
-        sequence,
-        expected_arrival_at,
-        actual_arrival_at
-      FROM trip_stops
-      WHERE id = ${id}
-      LIMIT 1
-    `) as TripStopRow[];
+    SELECT
+      id,
+      trip_id,
+      store_id,
+      sequence,
+      expected_arrival_at,
+      actual_arrival_at
+    FROM trip_stops
+    WHERE id = ${id}
+    LIMIT 1
+  `) as TripStopRow[];
 
     if (!tripStopRows.length) {
       throw new NotFoundError(TRIP_STOP_TEXT.error.empty_trip_stop);
@@ -195,13 +195,13 @@ export class TripStopsService {
     const tripStop = tripStopRows[0];
 
     const tripRows = await sql`
-      SELECT
-        id,
-        status
-      FROM trips
-      WHERE id = ${tripStop.trip_id}
-      LIMIT 1
-    `;
+    SELECT
+      id,
+      status
+    FROM trips
+    WHERE id = ${tripStop.trip_id}
+    LIMIT 1
+  `;
 
     if (!tripRows.length) {
       throw new NotFoundError(TRIP_STOP_TEXT.error.trip_not_found);
@@ -226,18 +226,23 @@ export class TripStopsService {
         ? data.expected_arrival_at
         : tripStop.expected_arrival_at;
 
+    const nextActualArrival =
+      data.actual_arrival_at !== undefined
+        ? data.actual_arrival_at
+        : tripStop.actual_arrival_at;
+
     if (nextSequence <= 0) {
       throw new ValidationError(TRIP_STOP_TEXT.error.invalid_sequence);
     }
 
     const existingStopRows = await sql`
-      SELECT id
-      FROM trip_stops
-      WHERE trip_id = ${tripStop.trip_id}
-        AND sequence = ${nextSequence}
-        AND id <> ${id}
-      LIMIT 1
-    `;
+    SELECT id
+    FROM trip_stops
+    WHERE trip_id = ${tripStop.trip_id}
+      AND sequence = ${nextSequence}
+      AND id <> ${id}
+    LIMIT 1
+  `;
 
     if (existingStopRows.length) {
       throw new ValidationError(TRIP_STOP_TEXT.error.sequence_already_exists);
@@ -250,26 +255,29 @@ export class TripStopsService {
       id,
     );
 
+    await this.validateActualArrivalTime(
+      tripStop.trip_id,
+      nextSequence,
+      nextActualArrival,
+      id,
+    );
+
     try {
       const rows = (await sql`
-        UPDATE trip_stops
-        SET
-          sequence = ${nextSequence},
-          expected_arrival_at = ${nextExpectedArrival},
-          actual_arrival_at: ${
-            data.actual_arrival_at !== undefined
-              ? data.actual_arrival_at
-              : tripStop.actual_arrival_at
-          }
-        WHERE id = ${id}
-        RETURNING
-          id,
-          trip_id,
-          store_id,
-          sequence,
-          expected_arrival_at,
-          actual_arrival_at
-      `) as TripStopRow[];
+      UPDATE trip_stops
+      SET
+        sequence = ${nextSequence},
+        expected_arrival_at = ${nextExpectedArrival},
+        actual_arrival_at = ${nextActualArrival}
+      WHERE id = ${id}
+      RETURNING
+        id,
+        trip_id,
+        store_id,
+        sequence,
+        expected_arrival_at,
+        actual_arrival_at
+    `) as TripStopRow[];
 
       if (!rows.length) {
         throw new NotFoundError(TRIP_STOP_TEXT.error.empty_trip_stop);
@@ -362,6 +370,55 @@ export class TripStopsService {
       }
 
       throw error;
+    }
+  }
+
+  private static async validateActualArrivalTime(
+    tripId: string,
+    sequence: number,
+    actualArrivalAt: string | null,
+    currentStopId?: string,
+  ): Promise<void> {
+    if (!actualArrivalAt) {
+      return;
+    }
+
+    const previousRows = await sql`
+    SELECT actual_arrival_at
+    FROM trip_stops
+    WHERE trip_id = ${tripId}
+      AND sequence < ${sequence}
+      AND actual_arrival_at IS NOT NULL
+      ${currentStopId ? sql`AND id <> ${currentStopId}` : sql``}
+    ORDER BY sequence DESC
+    LIMIT 1
+  `;
+
+    const nextRows = await sql`
+    SELECT actual_arrival_at
+    FROM trip_stops
+    WHERE trip_id = ${tripId}
+      AND sequence > ${sequence}
+      AND actual_arrival_at IS NOT NULL
+      ${currentStopId ? sql`AND id <> ${currentStopId}` : sql``}
+    ORDER BY sequence ASC
+    LIMIT 1
+  `;
+
+    const actualTimestamp = new Date(actualArrivalAt).getTime();
+
+    const previousArrival = previousRows[0]?.actual_arrival_at;
+    const nextArrival = nextRows[0]?.actual_arrival_at;
+
+    if (
+      previousArrival &&
+      actualTimestamp < new Date(previousArrival).getTime()
+    ) {
+      throw new ValidationError(TRIP_STOP_TEXT.error.invalid_arrival_time);
+    }
+
+    if (nextArrival && actualTimestamp > new Date(nextArrival).getTime()) {
+      throw new ValidationError(TRIP_STOP_TEXT.error.invalid_arrival_time);
     }
   }
 
