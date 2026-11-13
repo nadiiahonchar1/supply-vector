@@ -256,7 +256,11 @@ export class TripStopsService {
         SET
           sequence = ${nextSequence},
           expected_arrival_at = ${nextExpectedArrival},
-          actual_arrival_at = ${data.actual_arrival_at ?? tripStop.actual_arrival_at}
+          actual_arrival_at: ${
+            data.actual_arrival_at !== undefined
+              ? data.actual_arrival_at
+              : tripStop.actual_arrival_at
+          }
         WHERE id = ${id}
         RETURNING
           id,
