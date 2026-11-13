@@ -225,12 +225,6 @@ export class TripsService {
       throw new ValidationError(TRIP_TEXT.error.invalid_time_window);
     }
 
-    if (nextStatus === "cancelled") {
-      if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_CANCEL)) {
-        throw new ForbiddenError(TRIP_TEXT.error.forbidden_cancel);
-      }
-    }
-
     if (nextStatus === "ready" || nextStatus === "in_transit") {
       const vehicleRows = await sql`
       SELECT is_active
@@ -258,6 +252,21 @@ export class TripsService {
 
       if (activeTripRows.length) {
         throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
+      }
+    }
+
+    if (nextStatus === "delivered") {
+      const incompleteStops = await sql`
+    SELECT id
+    FROM trip_stops
+    WHERE trip_id = ${id}
+      AND sequence > 1
+      AND actual_arrival_at IS NULL
+    LIMIT 1
+  `;
+
+      if (incompleteStops.length > 0) {
+        throw new ValidationError(TRIP_TEXT.error.invalid_status_transition);
       }
     }
 
