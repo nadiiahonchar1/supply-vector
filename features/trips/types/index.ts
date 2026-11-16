@@ -12,6 +12,7 @@ export type Trip = {
   status: TripStatus;
   departure_at: string | null;
   expected_arrival_at: string | null;
+  formation_started_at: string | null;
   distance_km: number | null;
   cost: number | null;
   created_by: string | null;
