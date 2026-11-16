@@ -28,6 +28,14 @@ type VehicleRow = {
   updated_at: string;
 };
 
+type TripCargoRow = {
+  trip_id: string;
+  total_weight: number | string;
+  total_volume: number | string;
+  missing_weights: number;
+  missing_volumes: number;
+};
+
 function validateAvailability(
   availableFrom: string | null,
   availableTo: string | null,
@@ -216,6 +224,83 @@ export class VehiclesService {
       data.is_active !== undefined ? data.is_active : existing.is_active;
 
     validateAvailability(availableFrom, availableTo);
+    const capacityChanged =
+      capacityWeight !== existing.capacity_weight ||
+      capacityVolume !== existing.capacity_volume;
+
+    if (capacityChanged) {
+      const cargoRows = (await sql`
+    WITH cargo AS (
+      SELECT
+        ti.trip_id,
+        ti.quantity,
+        p.weight_kg,
+        p.volume_m3
+      FROM trip_items ti
+      JOIN trips t ON t.id = ti.trip_id
+      JOIN shipments s ON s.id = ti.shipment_id
+      JOIN shipment_items si ON si.shipment_id = s.id
+      LEFT JOIN products p ON p.id = si.product_id
+      WHERE t.vehicle_id = ${id}
+        AND t.status IN ('planned', 'ready', 'in_transit')
+        AND ti.shipment_id IS NOT NULL
+
+      UNION ALL
+
+      SELECT
+        ti.trip_id,
+        ti.quantity,
+        p.weight_kg,
+        p.volume_m3
+      FROM trip_items ti
+      JOIN trips t ON t.id = ti.trip_id
+      JOIN transfer_requests tr
+        ON tr.id = ti.transfer_request_id
+      LEFT JOIN products p ON p.id = tr.product_id
+      WHERE t.vehicle_id = ${id}
+        AND t.status IN ('planned', 'ready', 'in_transit')
+        AND ti.shipment_id IS NULL
+        AND ti.transfer_request_id IS NOT NULL
+    )
+    SELECT
+      trip_id,
+      COALESCE(
+        SUM(quantity * weight_kg),
+        0
+      ) AS total_weight,
+      COALESCE(
+        SUM(quantity * volume_m3),
+        0
+      ) AS total_volume,
+      COUNT(*) FILTER (
+        WHERE weight_kg IS NULL
+      )::INTEGER AS missing_weights,
+      COUNT(*) FILTER (
+        WHERE ${capacityVolume} IS NOT NULL
+          AND volume_m3 IS NULL
+      )::INTEGER AS missing_volumes
+    FROM cargo
+    GROUP BY trip_id
+  `) as TripCargoRow[];
+
+      const exceedsCapacity = cargoRows.some((cargo) => {
+        const totalWeight = Number(cargo.total_weight);
+        const totalVolume = Number(cargo.total_volume);
+
+        return (
+          cargo.missing_weights > 0 ||
+          cargo.missing_volumes > 0 ||
+          totalWeight > capacityWeight ||
+          (capacityVolume !== null && totalVolume > capacityVolume)
+        );
+      });
+
+      if (exceedsCapacity) {
+        throw new ValidationError(
+          VEHICLE_TEXT.error.capacity_below_current_load,
+        );
+      }
+    }
     if (existing.is_active && !isActive) {
       const activeTripRows = await sql`
       SELECT id
