@@ -1,0 +1,4 @@
+export const TRIP_FORMATION_THRESHOLDS = {
+  WARNING_HOURS: 24,
+  CRITICAL_HOURS: 48,
+} as const;
