@@ -37,3 +37,5 @@ export type UpdateTripInput = {
   distance_km?: number | null;
   cost?: number | null;
 };
+
+export type TripFormationAlertLevel = "none" | "warning" | "critical";
