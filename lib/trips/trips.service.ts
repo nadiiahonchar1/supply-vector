@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 
-import { TRIP_TEXT } from "@/features/trips";
+import { TRIP_TEXT, TRIP_FORMATION_THRESHOLDS } from "@/features/trips";
 import { hasPermission, PERMISSIONS } from "@/lib/auth";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
@@ -8,6 +8,7 @@ import type { CurrentUser } from "@/features/auth";
 import type {
   CreateTripInput,
   Trip,
+  TripListItem,
   TripStatus,
   UpdateTripInput,
 } from "@/features/trips";
@@ -15,29 +16,55 @@ import type {
 type TripRow = Trip;
 
 export class TripsService {
-  static async getTrips(currentUser: CurrentUser): Promise<Trip[]> {
+  static async getTrips(currentUser: CurrentUser): Promise<TripListItem[] > {
     if (!hasPermission(currentUser.role, PERMISSIONS.TRIP_VIEW)) {
       throw new ForbiddenError(TRIP_TEXT.error.forbidden_view);
     }
 
     const rows = (await sql`
-      SELECT
-        id,
-        vehicle_id,
-        origin_store_id,
-        status,
-        departure_at,
-        expected_arrival_at,
-        formation_started_at,
-        distance_km,
-        cost,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at
-      FROM trips
-      ORDER BY created_at DESC
-    `) as TripRow[];
+  SELECT
+    id,
+    vehicle_id,
+    origin_store_id,
+    status,
+    departure_at,
+    expected_arrival_at,
+    formation_started_at,
+
+    CASE
+      WHEN status = 'planned'
+        AND formation_started_at IS NOT NULL
+      THEN (
+        EXTRACT(EPOCH FROM (NOW() - formation_started_at)) / 3600.0
+      )::float8
+      ELSE NULL
+    END AS formation_duration_hours,
+
+    CASE
+      WHEN status = 'planned'
+        AND formation_started_at IS NOT NULL
+        AND NOW() - formation_started_at >=
+          (${TRIP_FORMATION_THRESHOLDS.CRITICAL_HOURS} * INTERVAL '1 hour')
+      THEN 'critical'
+
+      WHEN status = 'planned'
+        AND formation_started_at IS NOT NULL
+        AND NOW() - formation_started_at >=
+          (${TRIP_FORMATION_THRESHOLDS.WARNING_HOURS} * INTERVAL '1 hour')
+      THEN 'warning'
+
+      ELSE 'none'
+    END AS formation_alert_level,
+
+      distance_km,
+      cost,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at
+    FROM trips
+    ORDER BY created_at DESC
+  `) as TripListItem[];
 
     return rows;
   }
@@ -309,7 +336,6 @@ export class TripsService {
         updated_at
     `) as TripRow[];
     } catch (error) {
-     
       if (error instanceof Error && "code" in error && error.code === "23505") {
         throw new ValidationError(TRIP_TEXT.error.vehicle_already_assigned);
       }
