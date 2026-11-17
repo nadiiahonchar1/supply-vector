@@ -39,3 +39,8 @@ export type UpdateTripInput = {
 };
 
 export type TripFormationAlertLevel = "none" | "warning" | "critical";
+
+export type TripListItem = Trip & {
+  formation_duration_hours: number | null;
+  formation_alert_level: TripFormationAlertLevel;
+};
