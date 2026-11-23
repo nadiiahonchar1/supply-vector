@@ -443,7 +443,6 @@ BEGIN
             );
         END LOOP;
 
-        -- Refresh balances after explicit releases.
         SELECT *
         INTO v_inventory
         FROM inventory
