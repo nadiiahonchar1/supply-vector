@@ -8,10 +8,10 @@ CREATE TABLE transfer_requests (
     request_number BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
 
     destination_storage_point_id UUID NOT NULL
-        REFERENCES storage_points(id),
+        REFERENCES storage_points(id) ON DELETE RESTRICT,
 
     created_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     status TEXT NOT NULL DEFAULT 'draft'
         CHECK (
@@ -51,7 +51,7 @@ CREATE TABLE transfer_requests (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT transfer_requests_priority_reason_check
+    CONSTRAINT chk_transfer_requests_priority_reason
         CHECK (
             (
                 priority IN ('low', 'normal')
@@ -71,7 +71,7 @@ CREATE TABLE transfer_requests (
             )
         ),
 
-    CONSTRAINT transfer_requests_urgent_approval_check
+    CONSTRAINT chk_transfer_requests_urgent_approval
         CHECK (
             (
                 priority = 'urgent'
@@ -85,6 +85,19 @@ CREATE TABLE transfer_requests (
             (
                 priority <> 'urgent'
                 AND urgent_approval_status = 'not_required'
+            )
+        ),
+
+    CONSTRAINT chk_transfer_requests_terminal_dates
+        CHECK (
+            (
+                status NOT IN ('fulfilled', 'partially_fulfilled')
+                OR completed_at IS NOT NULL
+            )
+            AND
+            (
+                status <> 'cancelled'
+                OR cancelled_at IS NOT NULL
             )
         )
 );
@@ -116,18 +129,24 @@ CREATE TABLE transfer_request_items (
         REFERENCES transfer_requests(id) ON DELETE CASCADE,
 
     product_id UUID NOT NULL
-        REFERENCES products(id),
+        REFERENCES products(id) ON DELETE RESTRICT,
 
     requested_quantity INTEGER NOT NULL
         CHECK (requested_quantity > 0),
 
+    cancelled_quantity INTEGER NOT NULL DEFAULT 0
+        CHECK (cancelled_quantity >= 0),
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT transfer_request_items_unique_product
+    CONSTRAINT chk_transfer_request_item_cancelled_quantity
+        CHECK (cancelled_quantity <= requested_quantity),
+
+    CONSTRAINT uq_transfer_request_item_product
         UNIQUE (transfer_request_id, product_id),
 
-    CONSTRAINT transfer_request_items_id_request_unique
+    CONSTRAINT uq_transfer_request_item_id_request
         UNIQUE (id, transfer_request_id)
 );
 
@@ -150,18 +169,18 @@ CREATE TABLE transfer_request_sources (
     transfer_request_item_id UUID NOT NULL,
 
     source_storage_point_id UUID NOT NULL
-        REFERENCES storage_points(id),
+        REFERENCES storage_points(id) ON DELETE RESTRICT,
 
     allocated_quantity INTEGER NOT NULL
         CHECK (allocated_quantity > 0),
 
     created_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT transfer_request_sources_item_request_fk
+    CONSTRAINT fk_transfer_request_sources_item_request
         FOREIGN KEY (
             transfer_request_item_id,
             transfer_request_id
@@ -172,13 +191,13 @@ CREATE TABLE transfer_request_sources (
         )
         ON DELETE CASCADE,
 
-    CONSTRAINT transfer_request_sources_unique_source
+    CONSTRAINT uq_transfer_request_source_point
         UNIQUE (
             transfer_request_item_id,
             source_storage_point_id
         ),
 
-    CONSTRAINT transfer_request_sources_id_item_unique
+    CONSTRAINT uq_transfer_request_source_id_item
         UNIQUE (id, transfer_request_item_id)
 );
 
@@ -206,15 +225,15 @@ BEGIN
     SELECT destination_storage_point_id
     INTO destination_id
     FROM transfer_requests
-    WHERE id = NEW.transfer_request_id;
+    WHERE id = NEW.transfer_request_id
+    FOR KEY SHARE;
 
     IF destination_id IS NULL THEN
-        RAISE EXCEPTION 'Transfer request does not exist';
+        RAISE EXCEPTION 'TRANSFER_REQUEST_NOT_FOUND';
     END IF;
 
     IF NEW.source_storage_point_id = destination_id THEN
-        RAISE EXCEPTION
-            'Source storage point cannot be the destination';
+        RAISE EXCEPTION 'SOURCE_EQUALS_DESTINATION';
     END IF;
 
     RETURN NEW;
@@ -238,7 +257,7 @@ CREATE TABLE transfer_request_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     transfer_request_id UUID NOT NULL
-        REFERENCES transfer_requests(id),
+        REFERENCES transfer_requests(id) ON DELETE RESTRICT,
 
     event_type TEXT NOT NULL,
 
@@ -250,7 +269,7 @@ CREATE TABLE transfer_request_events (
     metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
 
     created_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -270,13 +289,13 @@ CREATE TABLE transfer_request_comments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     transfer_request_id UUID NOT NULL
-        REFERENCES transfer_requests(id),
+        REFERENCES transfer_requests(id) ON DELETE RESTRICT,
 
     comment TEXT NOT NULL
         CHECK (length(trim(comment)) > 0),
 
     created_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -296,7 +315,7 @@ CREATE TABLE transfer_request_priority_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     transfer_request_id UUID NOT NULL
-        REFERENCES transfer_requests(id),
+        REFERENCES transfer_requests(id) ON DELETE RESTRICT,
 
     old_priority TEXT
         CHECK (
@@ -312,7 +331,7 @@ CREATE TABLE transfer_request_priority_history (
     reason TEXT,
 
     changed_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -332,7 +351,7 @@ CREATE TABLE transfer_request_urgent_approvals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     transfer_request_id UUID NOT NULL
-        REFERENCES transfer_requests(id),
+        REFERENCES transfer_requests(id) ON DELETE RESTRICT,
 
     decision TEXT NOT NULL
         CHECK (decision IN ('approved', 'rejected')),
@@ -340,7 +359,7 @@ CREATE TABLE transfer_request_urgent_approvals (
     comment TEXT,
 
     decided_by UUID NOT NULL
-        REFERENCES users(id),
+        REFERENCES users(id) ON DELETE RESTRICT,
 
     decided_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -357,9 +376,10 @@ CREATE INDEX idx_transfer_request_urgent_approvals_request
 -- =========================================================
 
 ALTER TABLE inventory_reservations
-ADD CONSTRAINT inventory_reservations_transfer_request_source_fk
+ADD CONSTRAINT fk_inventory_reservations_request_source
 FOREIGN KEY (transfer_request_source_id)
-REFERENCES transfer_request_sources(id);
+REFERENCES transfer_request_sources(id)
+ON DELETE RESTRICT;
 
 
 -- =========================================================
@@ -371,8 +391,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    RAISE EXCEPTION
-        'This history table is append-only';
+    RAISE EXCEPTION 'HISTORY_RECORD_IMMUTABLE';
 END;
 $$;
 
