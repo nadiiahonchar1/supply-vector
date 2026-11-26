@@ -1,4 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- =====================================================
 -- 1. USERS
@@ -41,7 +42,7 @@ CREATE TABLE roles (
 
   code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
-  hierarchy_level SMALLINT NOT NULL UNIQUE,
+  hierarchy_level SMALLINT NOT NULL,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -132,6 +133,10 @@ CREATE TABLE password_resets (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX idx_password_resets_active_user
+  ON password_resets(user_id)
+  WHERE used_at IS NULL;
+
 
 CREATE TABLE password_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -168,9 +173,6 @@ CREATE TABLE employees (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_employees_user_id
-  ON employees(user_id);
 
 CREATE INDEX idx_employees_active
   ON employees(is_active);
@@ -288,18 +290,17 @@ CREATE TABLE department_managers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   CONSTRAINT chk_department_manager_dates
-    CHECK (valid_until IS NULL OR valid_until >= valid_from)
-);
+    CHECK (valid_until IS NULL OR valid_until >= valid_from),
 
-CREATE INDEX idx_department_managers_department
-  ON department_managers(department_id);
+  CONSTRAINT ex_department_manager_periods
+    EXCLUDE USING gist (
+      department_id WITH =,
+      daterange(valid_from, valid_until, '[]') WITH &&
+    )
+);
 
 CREATE INDEX idx_department_managers_employee
   ON department_managers(employee_id);
-
-CREATE UNIQUE INDEX idx_department_managers_active
-  ON department_managers(department_id)
-  WHERE valid_until IS NULL;
 
 
 -- =====================================================
