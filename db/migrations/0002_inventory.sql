@@ -131,6 +131,7 @@ CREATE TABLE inventory_movements (
         'shipment_load',
         'shipment_receive',
         'shipment_return',
+        'salvage_return',
         'writeoff',
         'adjustment'
       )
@@ -139,7 +140,12 @@ CREATE TABLE inventory_movements (
   CONSTRAINT chk_inventory_movement_balance
     CHECK (
       (
-        movement_type IN ('receipt', 'shipment_receive', 'shipment_return')
+        movement_type IN (
+          'receipt',
+          'shipment_receive',
+          'shipment_return',
+          'salvage_return'
+        )
         AND quantity_after = quantity_before + quantity
       )
       OR
@@ -150,6 +156,7 @@ CREATE TABLE inventory_movements (
       OR
       (
         movement_type = 'adjustment'
+        AND quantity = ABS(quantity_after - quantity_before)
         AND quantity_after <> quantity_before
       )
     )
@@ -237,6 +244,9 @@ CREATE TABLE inventory_reservation_movements (
 CREATE INDEX idx_reservation_movements_reservation
   ON inventory_reservation_movements(reservation_id);
 
+CREATE INDEX idx_reservation_movements_reference
+  ON inventory_reservation_movements(reference_type, reference_id);
+
 
 -- =====================================================
 -- 6. INVENTORY BLOCKS
@@ -293,6 +303,10 @@ CREATE TABLE inventory_block_movements (
 
   quantity INTEGER NOT NULL CHECK (quantity > 0),
 
+  reference_type TEXT,
+  reference_id UUID,
+
+  reason TEXT,
   comment TEXT,
 
   created_by UUID NOT NULL
@@ -306,6 +320,9 @@ CREATE TABLE inventory_block_movements (
 
 CREATE INDEX idx_inventory_block_movements_block
   ON inventory_block_movements(block_id);
+
+CREATE INDEX idx_inventory_block_movements_reference
+  ON inventory_block_movements(reference_type, reference_id);
 
 
 -- =====================================================
