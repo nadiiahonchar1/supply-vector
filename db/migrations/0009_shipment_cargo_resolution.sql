@@ -17,7 +17,7 @@ ALTER TABLE shipment_cargo_operations
 
 
 -- =========================================================
--- 2. RESOLVE PHYSICAL SHIPMENT CARGO
+-- 2. CARGO RESOLUTION
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION resolve_shipment_cargo(
@@ -28,6 +28,7 @@ CREATE OR REPLACE FUNCTION resolve_shipment_cargo(
     p_operation_key UUID,
     p_reason_code TEXT,
     p_return_storage_point_id UUID DEFAULT NULL,
+    p_return_disposition TEXT DEFAULT NULL,
     p_accounting_act_number TEXT DEFAULT NULL,
     p_comment TEXT DEFAULT NULL
 )
@@ -45,6 +46,7 @@ DECLARE
     v_remaining_quantity INTEGER;
 
     v_quantity_before INTEGER;
+    v_block_id UUID;
 BEGIN
     -- -----------------------------------------------------
     -- Basic validation
@@ -54,12 +56,12 @@ BEGIN
         RAISE EXCEPTION 'INVALID_QUANTITY';
     END IF;
 
-    IF p_operation_key IS NULL THEN
-        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
-    END IF;
-
     IF p_user_id IS NULL THEN
         RAISE EXCEPTION 'ACTOR_REQUIRED';
+    END IF;
+
+    IF p_operation_key IS NULL THEN
+        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
     END IF;
 
     IF p_reason_code IS NULL OR BTRIM(p_reason_code) = '' THEN
@@ -70,27 +72,33 @@ BEGIN
         RAISE EXCEPTION 'INVALID_CARGO_RESOLUTION_TYPE';
     END IF;
 
-    IF p_operation_type = 'return'
-       AND p_return_storage_point_id IS NULL THEN
-        RAISE EXCEPTION 'RETURN_STORAGE_POINT_REQUIRED';
+    IF p_operation_type = 'return' THEN
+        IF p_return_storage_point_id IS NULL THEN
+            RAISE EXCEPTION 'RETURN_STORAGE_POINT_REQUIRED';
+        END IF;
+
+        IF p_return_disposition NOT IN ('available', 'blocked') THEN
+            RAISE EXCEPTION 'INVALID_RETURN_DISPOSITION';
+        END IF;
+    ELSE
+        IF p_return_storage_point_id IS NOT NULL THEN
+            RAISE EXCEPTION 'RETURN_STORAGE_POINT_NOT_ALLOWED';
+        END IF;
+
+        IF p_return_disposition IS NOT NULL THEN
+            RAISE EXCEPTION 'RETURN_DISPOSITION_NOT_ALLOWED';
+        END IF;
     END IF;
 
-    IF p_operation_type <> 'return'
-       AND p_return_storage_point_id IS NOT NULL THEN
-        RAISE EXCEPTION 'RETURN_STORAGE_POINT_NOT_ALLOWED';
-    END IF;
-
-    IF p_operation_type = 'writeoff'
-       AND (
-           p_accounting_act_number IS NULL
-           OR BTRIM(p_accounting_act_number) = ''
-       ) THEN
-        RAISE EXCEPTION 'WRITEOFF_ACCOUNTING_ACT_REQUIRED';
-    END IF;
-
-    IF p_operation_type <> 'writeoff'
-       AND p_accounting_act_number IS NOT NULL THEN
-        RAISE EXCEPTION 'ACCOUNTING_ACT_NOT_ALLOWED';
+    IF p_operation_type = 'writeoff' THEN
+        IF p_accounting_act_number IS NULL
+           OR BTRIM(p_accounting_act_number) = '' THEN
+            RAISE EXCEPTION 'WRITEOFF_ACCOUNTING_ACT_REQUIRED';
+        END IF;
+    ELSE
+        IF p_accounting_act_number IS NOT NULL THEN
+            RAISE EXCEPTION 'ACCOUNTING_ACT_NOT_ALLOWED';
+        END IF;
     END IF;
 
 
@@ -108,20 +116,44 @@ BEGIN
     WHERE operation_key = p_operation_key;
 
     IF FOUND THEN
-        IF v_existing.shipment_item_id <> p_shipment_item_id
-           OR v_existing.operation_type <> p_operation_type
-           OR v_existing.quantity <> p_quantity
-           OR v_existing.performed_by <> p_user_id
-           OR v_existing.reason_code <> p_reason_code
+        IF v_existing.shipment_item_id
+                IS DISTINCT FROM p_shipment_item_id
+           OR v_existing.operation_type
+                IS DISTINCT FROM p_operation_type
+           OR v_existing.quantity
+                IS DISTINCT FROM p_quantity
+           OR v_existing.performed_by
+                IS DISTINCT FROM p_user_id
+           OR v_existing.reason_code
+                IS DISTINCT FROM p_reason_code
            OR v_existing.storage_point_id
                 IS DISTINCT FROM p_return_storage_point_id
            OR v_existing.accounting_act_number
                 IS DISTINCT FROM p_accounting_act_number
-           OR v_existing.comment IS DISTINCT FROM p_comment THEN
+           OR v_existing.comment
+                IS DISTINCT FROM p_comment THEN
             RAISE EXCEPTION 'IDEMPOTENCY_KEY_REUSED';
         END IF;
 
-        RETURN p_operation_key;
+        RETURN v_existing.id;
+    END IF;
+
+
+    -- -----------------------------------------------------
+    -- Validate actor
+    -- -----------------------------------------------------
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users u
+        JOIN employees e
+            ON e.user_id = u.id
+        WHERE u.id = p_user_id
+          AND u.is_active = TRUE
+          AND u.deleted_at IS NULL
+          AND e.is_active = TRUE
+    ) THEN
+        RAISE EXCEPTION 'ACTIVE_EMPLOYEE_REQUIRED';
     END IF;
 
 
@@ -191,7 +223,7 @@ BEGIN
 
 
     -- -----------------------------------------------------
-    -- Validate return destination
+    -- Validate return storage point
     -- -----------------------------------------------------
 
     IF p_operation_type = 'return' THEN
@@ -214,10 +246,11 @@ BEGIN
 
 
     -- -----------------------------------------------------
-    -- Record physical return in inventory
+    -- Process physical return
     -- -----------------------------------------------------
 
     IF p_operation_type = 'return' THEN
+
         INSERT INTO inventory (
             storage_point_id,
             product_id,
@@ -251,11 +284,18 @@ BEGIN
         UPDATE inventory
         SET
             quantity = quantity + p_quantity,
+            blocked_quantity = blocked_quantity
+                + CASE
+                    WHEN p_return_disposition = 'blocked'
+                    THEN p_quantity
+                    ELSE 0
+                  END,
             updated_at = NOW()
         WHERE id = v_inventory.id;
 
         INSERT INTO inventory_movements (
-            inventory_id,
+            storage_point_id,
+            product_id,
             movement_type,
             quantity,
             quantity_before,
@@ -266,7 +306,8 @@ BEGIN
             created_by
         )
         VALUES (
-            v_inventory.id,
+            p_return_storage_point_id,
+            v_item.product_id,
             'shipment_return',
             p_quantity,
             v_quantity_before,
@@ -276,6 +317,52 @@ BEGIN
             p_reason_code,
             p_user_id
         );
+
+        -- Damaged or otherwise unsuitable returned cargo
+        -- remains in stock but is excluded from availability.
+
+        IF p_return_disposition = 'blocked' THEN
+
+            INSERT INTO inventory_blocks (
+                inventory_id,
+                reason,
+                initial_quantity,
+                unblocked_quantity,
+                created_by
+            )
+            VALUES (
+                v_inventory.id,
+                'damage',
+                p_quantity,
+                0,
+                p_user_id
+            )
+            RETURNING id
+            INTO v_block_id;
+
+            INSERT INTO inventory_block_movements (
+                block_id,
+                movement_type,
+                quantity,
+                reference_type,
+                reference_id,
+                reason,
+                comment,
+                created_by
+            )
+            VALUES (
+                v_block_id,
+                'block',
+                p_quantity,
+                'shipment_item',
+                p_shipment_item_id,
+                p_reason_code,
+                p_comment,
+                p_user_id
+            );
+
+        END IF;
+
     END IF;
 
 
@@ -304,7 +391,14 @@ BEGIN
         p_comment,
         p_user_id,
         p_accounting_act_number
-    );
+    )
+    RETURNING id
+    INTO v_existing;
+
+
+    -- -----------------------------------------------------
+    -- Record shipment event
+    -- -----------------------------------------------------
 
     INSERT INTO shipment_events (
         shipment_id,
@@ -321,13 +415,18 @@ BEGIN
             'shipment_item_id', p_shipment_item_id,
             'quantity', p_quantity,
             'operation_type', p_operation_type,
-            'return_storage_point_id', p_return_storage_point_id,
-            'accounting_act_number', p_accounting_act_number,
-            'operation_key', p_operation_key
+            'return_storage_point_id',
+                p_return_storage_point_id,
+            'return_disposition',
+                p_return_disposition,
+            'accounting_act_number',
+                p_accounting_act_number,
+            'operation_key',
+                p_operation_key
         ),
         p_user_id
     );
 
-    RETURN p_operation_key;
+    RETURN v_existing.id;
 END;
 $$;
