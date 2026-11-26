@@ -1,15 +1,15 @@
 -- =========================================================
--- 1. IDEMPOTENCY FOR RESERVATION OPERATIONS
+-- 1. RESERVATION OPERATION IDEMPOTENCY
 -- =========================================================
 
 ALTER TABLE inventory_reservation_movements
-ADD COLUMN operation_key UUID;
+    ADD COLUMN operation_key UUID;
 
-CREATE UNIQUE INDEX idx_inventory_reservation_movements_operation_key
+CREATE UNIQUE INDEX uq_inventory_reservation_movements_operation_key
     ON inventory_reservation_movements(operation_key)
     WHERE operation_key IS NOT NULL;
 
-CREATE UNIQUE INDEX idx_inventory_reservations_source_inventory
+CREATE UNIQUE INDEX uq_inventory_reservations_source_inventory
     ON inventory_reservations(
         transfer_request_source_id,
         inventory_id
@@ -33,26 +33,42 @@ DECLARE
     v_source RECORD;
     v_inventory RECORD;
     v_reservation RECORD;
+    v_existing RECORD;
 
-    v_allocated_quantity INTEGER;
-    v_already_reserved INTEGER;
+    v_reserved_for_source INTEGER;
     v_available_quantity INTEGER;
 BEGIN
     IF p_quantity IS NULL OR p_quantity <= 0 THEN
-        RAISE EXCEPTION 'Reservation quantity must be positive';
+        RAISE EXCEPTION 'INVALID_QUANTITY';
     END IF;
 
     IF p_operation_key IS NULL THEN
-        RAISE EXCEPTION 'Operation key is required';
+        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
     END IF;
 
-    SELECT irm.reservation_id
-    INTO v_reservation
-    FROM inventory_reservation_movements irm
-    WHERE irm.operation_key = p_operation_key;
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'ACTOR_REQUIRED';
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(p_operation_key::TEXT, 0)
+    );
+
+    SELECT *
+    INTO v_existing
+    FROM inventory_reservation_movements
+    WHERE operation_key = p_operation_key;
 
     IF FOUND THEN
-        RETURN v_reservation.reservation_id;
+        IF v_existing.movement_type <> 'reserve'
+           OR v_existing.quantity <> p_quantity
+           OR v_existing.reference_type <> 'transfer_request_source'
+           OR v_existing.reference_id <> p_transfer_request_source_id
+           OR v_existing.created_by <> p_user_id THEN
+            RAISE EXCEPTION 'IDEMPOTENCY_KEY_REUSED';
+        END IF;
+
+        RETURN v_existing.reservation_id;
     END IF;
 
     SELECT
@@ -70,59 +86,58 @@ BEGIN
     JOIN transfer_requests tr
         ON tr.id = trs.transfer_request_id
     WHERE trs.id = p_transfer_request_source_id
-    FOR UPDATE OF trs;
+    FOR UPDATE OF trs, tr;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Transfer request source not found';
+        RAISE EXCEPTION 'TRANSFER_REQUEST_SOURCE_NOT_FOUND';
     END IF;
 
     IF v_source.request_status NOT IN ('approved', 'in_progress') THEN
-        RAISE EXCEPTION
-            'Inventory can only be reserved for approved or in-progress requests';
+        RAISE EXCEPTION 'TRANSFER_REQUEST_NOT_RESERVABLE';
     END IF;
 
     SELECT
-        id,
-        storage_point_id,
-        product_id,
-        quantity,
-        reserved_quantity,
-        blocked_quantity
+        i.id,
+        i.storage_point_id,
+        i.product_id,
+        i.quantity,
+        i.reserved_quantity,
+        i.blocked_quantity,
+        sp.status AS storage_point_status
     INTO v_inventory
-    FROM inventory
-    WHERE storage_point_id = v_source.source_storage_point_id
-      AND product_id = v_source.product_id
-    FOR UPDATE;
+    FROM inventory i
+    JOIN storage_points sp
+        ON sp.id = i.storage_point_id
+    WHERE i.storage_point_id = v_source.source_storage_point_id
+      AND i.product_id = v_source.product_id
+    FOR UPDATE OF i, sp;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Inventory record not found';
+        RAISE EXCEPTION 'INVENTORY_RECORD_NOT_FOUND';
     END IF;
 
     IF v_inventory.storage_point_id = v_source.destination_storage_point_id THEN
-        RAISE EXCEPTION 'Source and destination cannot be the same';
+        RAISE EXCEPTION 'SOURCE_EQUALS_DESTINATION';
     END IF;
 
-    IF EXISTS (
-        SELECT 1
-        FROM storage_points
-        WHERE id = v_source.source_storage_point_id
-          AND status = 'closed'
-    ) THEN
-        RAISE EXCEPTION
-            'Inventory cannot be reserved from a closed storage point';
+    IF v_inventory.storage_point_status = 'closed' THEN
+        RAISE EXCEPTION 'STORAGE_POINT_CLOSED';
     END IF;
 
     SELECT COALESCE(
-        SUM(ir.reserved_quantity - ir.consumed_quantity - ir.released_quantity),
+        SUM(
+            ir.reserved_quantity
+            - ir.consumed_quantity
+            - ir.released_quantity
+        ),
         0
     )
-    INTO v_already_reserved
+    INTO v_reserved_for_source
     FROM inventory_reservations ir
     WHERE ir.transfer_request_source_id = p_transfer_request_source_id;
 
-    IF v_already_reserved + p_quantity > v_source.allocated_quantity THEN
-        RAISE EXCEPTION
-            'Reservation exceeds the source allocation quantity';
+    IF v_reserved_for_source + p_quantity > v_source.allocated_quantity THEN
+        RAISE EXCEPTION 'RESERVATION_EXCEEDS_SOURCE_ALLOCATION';
     END IF;
 
     v_available_quantity :=
@@ -131,10 +146,7 @@ BEGIN
         - v_inventory.blocked_quantity;
 
     IF v_available_quantity < p_quantity THEN
-        RAISE EXCEPTION
-            'Insufficient available inventory. Available: %, requested: %',
-            v_available_quantity,
-            p_quantity;
+        RAISE EXCEPTION 'INSUFFICIENT_AVAILABLE_INVENTORY';
     END IF;
 
     SELECT *
@@ -224,25 +236,45 @@ DECLARE
     v_inventory RECORD;
     v_source RECORD;
     v_shipment RECORD;
+    v_trip RECORD;
+    v_existing RECORD;
 
     v_remaining_reserved INTEGER;
+    v_loaded_quantity INTEGER;
     v_quantity_before INTEGER;
 BEGIN
     IF p_quantity IS NULL OR p_quantity <= 0 THEN
-        RAISE EXCEPTION 'Consumption quantity must be positive';
+        RAISE EXCEPTION 'INVALID_QUANTITY';
     END IF;
 
     IF p_operation_key IS NULL THEN
-        RAISE EXCEPTION 'Operation key is required';
+        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
     END IF;
 
-    SELECT irm.reservation_id
-    INTO v_reservation
-    FROM inventory_reservation_movements irm
-    WHERE irm.operation_key = p_operation_key;
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'ACTOR_REQUIRED';
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(p_operation_key::TEXT, 0)
+    );
+
+    SELECT *
+    INTO v_existing
+    FROM inventory_reservation_movements
+    WHERE operation_key = p_operation_key;
 
     IF FOUND THEN
-        RETURN v_reservation.reservation_id;
+        IF v_existing.movement_type <> 'consume'
+           OR v_existing.quantity <> p_quantity
+           OR v_existing.reference_type <> 'shipment_item'
+           OR v_existing.reference_id <> p_shipment_item_id
+           OR v_existing.reservation_id <> p_reservation_id
+           OR v_existing.created_by <> p_user_id THEN
+            RAISE EXCEPTION 'IDEMPOTENCY_KEY_REUSED';
+        END IF;
+
+        RETURN v_existing.reservation_id;
     END IF;
 
     SELECT *
@@ -252,17 +284,21 @@ BEGIN
     FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Inventory reservation not found';
+        RAISE EXCEPTION 'INVENTORY_RESERVATION_NOT_FOUND';
     END IF;
 
-    SELECT *
+    SELECT
+        i.*,
+        sp.status AS storage_point_status
     INTO v_inventory
-    FROM inventory
-    WHERE id = v_reservation.inventory_id
-    FOR UPDATE;
+    FROM inventory i
+    JOIN storage_points sp
+        ON sp.id = i.storage_point_id
+    WHERE i.id = v_reservation.inventory_id
+    FOR UPDATE OF i, sp;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Inventory record not found';
+        RAISE EXCEPTION 'INVENTORY_RECORD_NOT_FOUND';
     END IF;
 
     SELECT
@@ -274,10 +310,11 @@ BEGIN
     FROM transfer_request_sources trs
     JOIN transfer_request_items tri
         ON tri.id = trs.transfer_request_item_id
-    WHERE trs.id = v_reservation.transfer_request_source_id;
+    WHERE trs.id = v_reservation.transfer_request_source_id
+    FOR KEY SHARE OF trs, tri;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Transfer request source not found';
+        RAISE EXCEPTION 'TRANSFER_REQUEST_SOURCE_NOT_FOUND';
     END IF;
 
     SELECT
@@ -285,6 +322,7 @@ BEGIN
         si.shipment_id,
         si.transfer_request_source_id,
         si.product_id,
+        si.planned_quantity,
         s.status AS shipment_status,
         s.source_storage_point_id,
         s.trip_id
@@ -296,44 +334,46 @@ BEGIN
     FOR UPDATE OF si, s;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Shipment item not found';
+        RAISE EXCEPTION 'SHIPMENT_ITEM_NOT_FOUND';
     END IF;
 
     IF v_shipment.transfer_request_source_id
         <> v_reservation.transfer_request_source_id THEN
-        RAISE EXCEPTION
-            'Shipment item does not belong to this reservation source';
+        RAISE EXCEPTION 'SHIPMENT_RESERVATION_SOURCE_MISMATCH';
     END IF;
 
-    IF v_shipment.product_id <> v_inventory.product_id THEN
-        RAISE EXCEPTION
-            'Shipment product does not match inventory product';
+    IF v_shipment.product_id <> v_inventory.product_id
+       OR v_source.product_id <> v_inventory.product_id THEN
+        RAISE EXCEPTION 'SHIPMENT_PRODUCT_MISMATCH';
     END IF;
 
     IF v_shipment.source_storage_point_id
+        <> v_inventory.storage_point_id
+       OR v_source.source_storage_point_id
         <> v_inventory.storage_point_id THEN
-        RAISE EXCEPTION
-            'Shipment source does not match inventory storage point';
+        RAISE EXCEPTION 'SHIPMENT_SOURCE_MISMATCH';
     END IF;
 
-    IF v_shipment.status NOT IN ('pending', 'in_progress') THEN
-        RAISE EXCEPTION
-            'Shipment cannot be loaded in its current status';
+    IF v_shipment.shipment_status <> 'pending' THEN
+        RAISE EXCEPTION 'SHIPMENT_NOT_READY_FOR_LOADING';
     END IF;
 
     IF v_shipment.trip_id IS NULL THEN
-        RAISE EXCEPTION
-            'Shipment must be assigned to a trip before loading';
+        RAISE EXCEPTION 'SHIPMENT_TRIP_REQUIRED';
     END IF;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM trips
-        WHERE id = v_shipment.trip_id
-          AND status IN ('ready', 'in_transit')
-    ) THEN
-        RAISE EXCEPTION
-            'Trip must be ready or in transit before loading';
+    SELECT *
+    INTO v_trip
+    FROM trips
+    WHERE id = v_shipment.trip_id
+    FOR UPDATE;
+
+    IF NOT FOUND OR v_trip.status <> 'ready' THEN
+        RAISE EXCEPTION 'TRIP_NOT_READY_FOR_LOADING';
+    END IF;
+
+    IF v_inventory.storage_point_status = 'closed' THEN
+        RAISE EXCEPTION 'STORAGE_POINT_CLOSED';
     END IF;
 
     v_remaining_reserved :=
@@ -342,16 +382,22 @@ BEGIN
         - v_reservation.released_quantity;
 
     IF v_remaining_reserved < p_quantity THEN
-        RAISE EXCEPTION
-            'Insufficient remaining reservation. Available: %, requested: %',
-            v_remaining_reserved,
-            p_quantity;
+        RAISE EXCEPTION 'INSUFFICIENT_REMAINING_RESERVATION';
+    END IF;
+
+    SELECT COALESCE(SUM(sco.quantity), 0)
+    INTO v_loaded_quantity
+    FROM shipment_cargo_operations sco
+    WHERE sco.shipment_item_id = p_shipment_item_id
+      AND sco.operation_type = 'load';
+
+    IF v_loaded_quantity + p_quantity > v_shipment.planned_quantity THEN
+        RAISE EXCEPTION 'LOADING_EXCEEDS_PLANNED_QUANTITY';
     END IF;
 
     IF v_inventory.quantity < p_quantity
        OR v_inventory.reserved_quantity < p_quantity THEN
-        RAISE EXCEPTION
-            'Inventory balance is inconsistent with reservation';
+        RAISE EXCEPTION 'INVENTORY_RESERVATION_BALANCE_MISMATCH';
     END IF;
 
     v_quantity_before := v_inventory.quantity;
@@ -413,6 +459,21 @@ BEGIN
         p_operation_key
     );
 
+    INSERT INTO shipment_cargo_operations (
+        shipment_item_id,
+        operation_type,
+        quantity,
+        operation_key,
+        performed_by
+    )
+    VALUES (
+        p_shipment_item_id,
+        'load',
+        p_quantity,
+        p_operation_key,
+        p_user_id
+    );
+
     RETURN p_reservation_id;
 END;
 $$;
@@ -437,29 +498,47 @@ AS $$
 DECLARE
     v_reservation RECORD;
     v_inventory RECORD;
+    v_existing RECORD;
 
     v_remaining_reserved INTEGER;
 BEGIN
     IF p_quantity IS NULL OR p_quantity <= 0 THEN
-        RAISE EXCEPTION 'Release quantity must be positive';
+        RAISE EXCEPTION 'INVALID_QUANTITY';
     END IF;
 
-    IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
-        RAISE EXCEPTION 'Release reason is required';
+    IF p_reason IS NULL OR BTRIM(p_reason) = '' THEN
+        RAISE EXCEPTION 'RELEASE_REASON_REQUIRED';
     END IF;
 
     IF p_operation_key IS NULL THEN
-        RAISE EXCEPTION 'Operation key is required';
+        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
     END IF;
 
-    -- Idempotency check.
-    SELECT irm.reservation_id
-    INTO v_reservation
-    FROM inventory_reservation_movements irm
-    WHERE irm.operation_key = p_operation_key;
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'ACTOR_REQUIRED';
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(p_operation_key::TEXT, 0)
+    );
+
+    SELECT *
+    INTO v_existing
+    FROM inventory_reservation_movements
+    WHERE operation_key = p_operation_key;
 
     IF FOUND THEN
-        RETURN v_reservation.reservation_id;
+        IF v_existing.movement_type <> 'release'
+           OR v_existing.quantity <> p_quantity
+           OR v_existing.reference_type IS DISTINCT FROM p_reference_type
+           OR v_existing.reference_id IS DISTINCT FROM p_reference_id
+           OR v_existing.reservation_id <> p_reservation_id
+           OR v_existing.reason <> p_reason
+           OR v_existing.created_by <> p_user_id THEN
+            RAISE EXCEPTION 'IDEMPOTENCY_KEY_REUSED';
+        END IF;
+
+        RETURN v_existing.reservation_id;
     END IF;
 
     SELECT *
@@ -469,7 +548,7 @@ BEGIN
     FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Inventory reservation not found';
+        RAISE EXCEPTION 'INVENTORY_RESERVATION_NOT_FOUND';
     END IF;
 
     SELECT *
@@ -479,7 +558,7 @@ BEGIN
     FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Inventory record not found';
+        RAISE EXCEPTION 'INVENTORY_RECORD_NOT_FOUND';
     END IF;
 
     v_remaining_reserved :=
@@ -488,15 +567,11 @@ BEGIN
         - v_reservation.released_quantity;
 
     IF v_remaining_reserved < p_quantity THEN
-        RAISE EXCEPTION
-            'Insufficient remaining reservation. Available: %, requested: %',
-            v_remaining_reserved,
-            p_quantity;
+        RAISE EXCEPTION 'INSUFFICIENT_REMAINING_RESERVATION';
     END IF;
 
     IF v_inventory.reserved_quantity < p_quantity THEN
-        RAISE EXCEPTION
-            'Inventory reserved balance is inconsistent';
+        RAISE EXCEPTION 'INVENTORY_RESERVED_BALANCE_MISMATCH';
     END IF;
 
     UPDATE inventory
