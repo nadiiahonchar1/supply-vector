@@ -1,20 +1,22 @@
 -- =========================================================
--- 1. WAREHOUSE LOCATION CLOSURE CYCLES
+-- 1. STORAGE POINT CLOSURE CYCLES
 -- =========================================================
 
 CREATE TABLE storage_point_closure_cycles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   storage_point_id UUID NOT NULL
-    REFERENCES storage_points(id),
+    REFERENCES storage_points(id) ON DELETE RESTRICT,
 
   closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  closed_by UUID REFERENCES users(id),
+  closed_by UUID
+    REFERENCES users(id) ON DELETE RESTRICT,
 
   reopened_at TIMESTAMPTZ,
 
-  reopened_by UUID REFERENCES users(id),
+  reopened_by UUID
+    REFERENCES users(id) ON DELETE RESTRICT,
 
   closure_reason TEXT,
 
@@ -27,6 +29,12 @@ CREATE TABLE storage_point_closure_cycles (
       (reopened_at IS NULL AND reopened_by IS NULL)
       OR
       (reopened_at IS NOT NULL AND reopened_by IS NOT NULL)
+    ),
+
+  CONSTRAINT closure_cycle_reopening_after_closing
+    CHECK (
+      reopened_at IS NULL
+      OR reopened_at >= closed_at
     ),
 
   CONSTRAINT closure_cycle_reason_check
@@ -47,78 +55,141 @@ CREATE UNIQUE INDEX storage_point_one_open_closure_cycle_idx
   WHERE reopened_at IS NULL;
 
 CREATE INDEX storage_point_closure_cycles_history_idx
-  ON storage_point_closure_cycles(storage_point_id, closed_at DESC);
+  ON storage_point_closure_cycles(
+    storage_point_id,
+    closed_at DESC
+  );
 
 
 -- =========================================================
--- 2. LINKING LOCKS TO A SPECIFIC CYCLE
+-- 2. MIGRATE EXISTING CLOSURE HISTORY
+-- =========================================================
+
+INSERT INTO storage_point_closure_cycles (
+  id,
+  storage_point_id,
+  closed_at,
+  closed_by,
+  reopened_at,
+  reopened_by,
+  closure_reason,
+  reopening_reason,
+  created_at
+)
+SELECT
+  sc.id,
+  sc.storage_point_id,
+  sc.closed_at,
+  sc.closed_by,
+  sc.reopened_at,
+  sc.reopened_by,
+  sc.closure_reason,
+  sc.reopening_reason,
+  sc.created_at
+FROM storage_point_closures sc
+ON CONFLICT (id) DO NOTHING;
+
+
+-- =========================================================
+-- 3. EXTEND CLOSURE BLOCKS
 -- =========================================================
 
 ALTER TABLE storage_point_closure_blocks
   ADD COLUMN closure_cycle_id UUID
-  REFERENCES storage_point_closure_cycles(id);
+    REFERENCES storage_point_closure_cycles(id)
+    ON DELETE RESTRICT;
 
 ALTER TABLE storage_point_closure_blocks
-  DROP CONSTRAINT IF EXISTS
-    storage_point_closure_blocks_storage_point_id_product_id_key;
+  ADD COLUMN storage_point_id UUID
+    REFERENCES storage_points(id)
+    ON DELETE RESTRICT;
 
-INSERT INTO storage_point_closure_cycles (
-  storage_point_id,
-  closed_at,
-  closure_reason
-)
-SELECT DISTINCT
-  b.storage_point_id,
-  b.created_at,
-  'Історичний цикл закриття'
-FROM storage_point_closure_blocks b
-WHERE b.closure_cycle_id IS NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM storage_point_closure_cycles c
-    WHERE c.storage_point_id = b.storage_point_id
-      AND c.reopened_at IS NULL
+ALTER TABLE storage_point_closure_blocks
+  ADD COLUMN created_at TIMESTAMPTZ
+    NOT NULL DEFAULT NOW();
+
+
+-- =========================================================
+-- 4. MIGRATE CLOSURE BLOCK REFERENCES
+-- =========================================================
+
+UPDATE storage_point_closure_blocks cb
+SET
+  closure_cycle_id = sc.id,
+  storage_point_id = sc.storage_point_id,
+  created_at = sc.closed_at
+FROM storage_point_closures sc
+WHERE sc.id = cb.closure_id
+  AND (
+    cb.closure_cycle_id IS NULL
+    OR cb.storage_point_id IS NULL
   );
 
-UPDATE storage_point_closure_blocks b
-SET closure_cycle_id = (
-  SELECT c.id
-  FROM storage_point_closure_cycles c
-  WHERE c.storage_point_id = b.storage_point_id
-  ORDER BY c.closed_at DESC
-  LIMIT 1
-)
-WHERE b.closure_cycle_id IS NULL;
+
+-- =========================================================
+-- 5. VERIFY MIGRATED CLOSURE BLOCK REFERENCES
+-- =========================================================
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM storage_point_closure_blocks
+    WHERE closure_cycle_id IS NULL
+       OR storage_point_id IS NULL
+  ) THEN
+    RAISE EXCEPTION
+      'CLOSURE_BLOCK_MIGRATION_INCOMPLETE';
+  END IF;
+END;
+$$;
 
 ALTER TABLE storage_point_closure_blocks
   ALTER COLUMN closure_cycle_id SET NOT NULL;
 
-CREATE UNIQUE INDEX storage_point_closure_cycle_product_idx
-  ON storage_point_closure_blocks(closure_cycle_id, product_id);
+ALTER TABLE storage_point_closure_blocks
+  ALTER COLUMN storage_point_id SET NOT NULL;
 
 
 -- =========================================================
--- 3. AUTOMATIC LINKING OF NEW LOCKS TO THE CYCLE
+-- 6. CLOSURE CYCLE PRODUCT UNIQUENESS
+-- =========================================================
+
+CREATE UNIQUE INDEX storage_point_closure_cycle_product_idx
+  ON storage_point_closure_blocks(
+    closure_cycle_id,
+    product_id
+  );
+
+
+-- =========================================================
+-- 7. AUTOMATIC CYCLE ASSIGNMENT
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION assign_closure_cycle_to_block()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_cycle RECORD;
 BEGIN
   IF NEW.closure_cycle_id IS NULL THEN
-    SELECT id
-    INTO NEW.closure_cycle_id
+    SELECT
+      id,
+      storage_point_id
+    INTO v_cycle
     FROM storage_point_closure_cycles
     WHERE storage_point_id = NEW.storage_point_id
       AND reopened_at IS NULL
     ORDER BY closed_at DESC
-    LIMIT 1;
-  END IF;
+    LIMIT 1
+    FOR UPDATE;
 
-  IF NEW.closure_cycle_id IS NULL THEN
-    RAISE EXCEPTION
-      'Для складської точки не знайдено активного циклу закриття';
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'ACTIVE_CLOSURE_CYCLE_NOT_FOUND';
+    END IF;
+
+    NEW.closure_cycle_id := v_cycle.id;
   END IF;
 
   IF NOT EXISTS (
@@ -128,8 +199,7 @@ BEGIN
       AND storage_point_id = NEW.storage_point_id
       AND reopened_at IS NULL
   ) THEN
-    RAISE EXCEPTION
-      'Блокування можна створити лише в активному циклі закриття';
+    RAISE EXCEPTION 'INVALID_ACTIVE_CLOSURE_CYCLE';
   END IF;
 
   RETURN NEW;
@@ -144,25 +214,27 @@ EXECUTE FUNCTION assign_closure_cycle_to_block();
 
 
 -- =========================================================
--- 4. HISTORY OF WAREHOUSE LOCATION STATUS CHANGES
+-- 8. STORAGE POINT STATUS HISTORY
 -- =========================================================
 
 CREATE TABLE storage_point_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   storage_point_id UUID NOT NULL
-    REFERENCES storage_points(id),
+    REFERENCES storage_points(id) ON DELETE RESTRICT,
 
   old_status TEXT NOT NULL,
 
   new_status TEXT NOT NULL,
 
-  changed_by UUID REFERENCES users(id),
+  changed_by UUID
+    REFERENCES users(id) ON DELETE RESTRICT,
 
   reason TEXT,
 
   closure_cycle_id UUID
-    REFERENCES storage_point_closure_cycles(id),
+    REFERENCES storage_point_closure_cycles(id)
+    ON DELETE RESTRICT,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -180,11 +252,14 @@ CREATE TABLE storage_point_status_history (
 );
 
 CREATE INDEX storage_point_status_history_point_idx
-  ON storage_point_status_history(storage_point_id, created_at DESC);
+  ON storage_point_status_history(
+    storage_point_id,
+    created_at DESC
+  );
 
 
 -- =========================================================
--- 5. PROHIBITION ON CHANGING STATUS HISTORY
+-- 9. IMMUTABLE STATUS HISTORY
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_storage_point_status_history_mutation()
@@ -192,8 +267,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION
-    'Історію статусів складської точки не можна змінювати або видаляти';
+  RAISE EXCEPTION 'STORAGE_POINT_STATUS_HISTORY_IMMUTABLE';
 END;
 $$;
 
@@ -205,7 +279,7 @@ EXECUTE FUNCTION prevent_storage_point_status_history_mutation();
 
 
 -- =========================================================
--- 6. PROHIBITION OF RECLOSING WITH UNRESOLVED BLOCKAGES
+-- 10. PREVENT RECLOSING WITH UNRELEASED BLOCKS
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_closure_with_unreleased_blocks()
@@ -218,15 +292,15 @@ BEGIN
 
     IF EXISTS (
       SELECT 1
-      FROM storage_point_closure_blocks b
-      JOIN storage_point_closure_cycles c
-        ON c.id = b.closure_cycle_id
-      WHERE b.storage_point_id = NEW.id
-        AND c.reopened_at IS NOT NULL
-        AND b.initial_quantity > b.released_quantity
+      FROM storage_point_closure_blocks cb
+      JOIN storage_point_closure_cycles cc
+        ON cc.id = cb.closure_cycle_id
+      WHERE cb.storage_point_id = NEW.id
+        AND cc.reopened_at IS NOT NULL
+        AND cb.initial_quantity > cb.released_quantity
     ) THEN
       RAISE EXCEPTION
-        'Неможливо повторно закрити точку: залишилися нерозблоковані товари з попереднього циклу';
+        'PREVIOUS_CLOSURE_BLOCKS_REMAIN_UNRELEASED';
     END IF;
 
   END IF;
@@ -243,19 +317,19 @@ EXECUTE FUNCTION prevent_closure_with_unreleased_blocks();
 
 
 -- =========================================================
--- 7. AUTHORIZATION FOR REOPENING
+-- 11. REOPENING PERMISSION
 -- =========================================================
 
 INSERT INTO permissions (code, name)
 VALUES (
   'storage_point_reopen',
-  'Повторне відкриття закритої складської точки'
+  'Reopen closed storage point'
 )
 ON CONFLICT (code) DO NOTHING;
 
 
 -- =========================================================
--- 8. RE-OPENING FUNCTION
+-- 12. REOPEN STORAGE POINT
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION reopen_storage_point(
@@ -271,16 +345,19 @@ DECLARE
   v_cycle_id UUID;
   v_old_status TEXT;
 BEGIN
+  IF p_storage_point_id IS NULL
+     OR p_user_id IS NULL THEN
+    RAISE EXCEPTION 'INVALID_REOPEN_ARGUMENTS';
+  END IF;
+
   IF p_new_status NOT IN ('active', 'unavailable') THEN
-    RAISE EXCEPTION
-      'Після закриття точку можна відкрити лише зі статусом active або unavailable';
+    RAISE EXCEPTION 'INVALID_REOPEN_STATUS';
   END IF;
 
   IF p_reason IS NULL
-     OR LENGTH(TRIM(p_reason)) = 0
+     OR BTRIM(p_reason) = ''
      OR LENGTH(p_reason) > 2000 THEN
-    RAISE EXCEPTION
-      'Необхідно вказати причину повторного відкриття';
+    RAISE EXCEPTION 'REOPEN_REASON_REQUIRED';
   END IF;
 
   IF NOT EXISTS (
@@ -289,8 +366,7 @@ BEGIN
     WHERE id = p_user_id
       AND is_active = TRUE
   ) THEN
-    RAISE EXCEPTION
-      'Користувач неактивний або не існує';
+    RAISE EXCEPTION 'ACTIVE_USER_REQUIRED';
   END IF;
 
   IF NOT EXISTS (
@@ -303,8 +379,7 @@ BEGIN
     WHERE ur.user_id = p_user_id
       AND p.code = 'storage_point_reopen'
   ) THEN
-    RAISE EXCEPTION
-      'Недостатньо прав для повторного відкриття точки';
+    RAISE EXCEPTION 'STORAGE_POINT_REOPEN_PERMISSION_REQUIRED';
   END IF;
 
   SELECT status
@@ -314,12 +389,11 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Складську точку не знайдено';
+    RAISE EXCEPTION 'STORAGE_POINT_NOT_FOUND';
   END IF;
 
   IF v_old_status <> 'closed' THEN
-    RAISE EXCEPTION
-      'Повторно відкрити можна лише закриту точку';
+    RAISE EXCEPTION 'STORAGE_POINT_NOT_CLOSED';
   END IF;
 
   SELECT id
@@ -329,21 +403,29 @@ BEGIN
     AND reopened_at IS NULL
   FOR UPDATE;
 
-  IF v_cycle_id IS NULL THEN
-    RAISE EXCEPTION
-      'Для точки не знайдено активного циклу закриття';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ACTIVE_CLOSURE_CYCLE_NOT_FOUND';
   END IF;
 
   UPDATE storage_point_closure_cycles
   SET
     reopened_at = NOW(),
     reopened_by = p_user_id,
-    reopening_reason = TRIM(p_reason)
+    reopening_reason = BTRIM(p_reason)
   WHERE id = v_cycle_id;
 
+  UPDATE storage_point_closures
+  SET
+    reopened_at = NOW(),
+    reopened_by = p_user_id,
+    reopening_reason = BTRIM(p_reason)
+  WHERE id = v_cycle_id
+    AND reopened_at IS NULL;
+
   UPDATE storage_points
-  SET status = p_new_status,
-      updated_at = NOW()
+  SET
+    status = p_new_status,
+    updated_at = NOW()
   WHERE id = p_storage_point_id;
 
   INSERT INTO storage_point_status_history (
@@ -359,7 +441,7 @@ BEGIN
     v_old_status,
     p_new_status,
     p_user_id,
-    TRIM(p_reason),
+    BTRIM(p_reason),
     v_cycle_id
   );
 
@@ -369,40 +451,43 @@ $$;
 
 
 -- =========================================================
--- 9. MONITORING OF UNRELEASED RESIDUES AFTER OPENING
+-- 13. CLOSURE BLOCK REMAINING QUANTITY
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_storage_point_closure_remaining AS
 SELECT
-  b.id AS closure_block_id,
-  b.closure_cycle_id,
-  b.storage_point_id,
+  cb.id AS closure_block_id,
+  cb.closure_id,
+  cb.closure_cycle_id,
+  cb.storage_point_id,
   sp.name AS storage_point_name,
-  b.product_id,
+
+  cb.inventory_id,
+  cb.product_id,
   p.sku,
   p.name AS product_name,
 
-  b.initial_quantity,
-  b.released_quantity,
+  cb.initial_quantity,
+  cb.released_quantity,
 
   (
-    b.initial_quantity - b.released_quantity
+    cb.initial_quantity - cb.released_quantity
   ) AS remaining_closure_block_quantity,
 
-  c.closed_at,
-  c.reopened_at,
+  cc.closed_at,
+  cc.reopened_at,
 
   sp.status AS current_storage_point_status
 
-FROM storage_point_closure_blocks b
+FROM storage_point_closure_blocks cb
+
+JOIN storage_point_closure_cycles cc
+  ON cc.id = cb.closure_cycle_id
 
 JOIN storage_points sp
-  ON sp.id = b.storage_point_id
+  ON sp.id = cb.storage_point_id
 
 JOIN products p
-  ON p.id = b.product_id
+  ON p.id = cb.product_id
 
-JOIN storage_point_closure_cycles c
-  ON c.id = b.closure_cycle_id
-
-WHERE b.initial_quantity > b.released_quantity;
+WHERE cb.initial_quantity > cb.released_quantity;
