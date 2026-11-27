@@ -1,13 +1,15 @@
 -- =========================================================
--- 1. EVENT TYPES
+-- 1. TRIP INCIDENTS
 -- =========================================================
 
 CREATE TABLE trip_incidents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  trip_id UUID NOT NULL REFERENCES trips(id),
+  trip_id UUID NOT NULL
+    REFERENCES trips(id) ON DELETE RESTRICT,
 
-  reported_by UUID NOT NULL REFERENCES users(id),
+  reported_by UUID NOT NULL
+    REFERENCES users(id) ON DELETE RESTRICT,
 
   incident_type TEXT NOT NULL,
 
@@ -38,7 +40,8 @@ CREATE TABLE trip_incidents (
 
   CONSTRAINT trip_incidents_comment_check
     CHECK (
-      comment IS NULL OR LENGTH(comment) <= 2000
+      comment IS NULL
+      OR LENGTH(comment) <= 2000
     )
 );
 
@@ -48,9 +51,24 @@ CREATE INDEX trip_incidents_trip_idx
 CREATE INDEX trip_incidents_reporter_idx
   ON trip_incidents(reported_by, occurred_at DESC);
 
+CREATE INDEX trip_incidents_type_idx
+  ON trip_incidents(incident_type, occurred_at DESC);
+
 
 -- =========================================================
--- 2. MESSAGE IMMUNITY
+-- 2. INCIDENT REPORTING PERMISSION
+-- =========================================================
+
+INSERT INTO permissions (code, name)
+VALUES (
+  'trip_incident_report',
+  'Report trip incidents'
+)
+ON CONFLICT (code) DO NOTHING;
+
+
+-- =========================================================
+-- 3. IMMUTABLE INCIDENT HISTORY
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_trip_incident_mutation()
@@ -58,8 +76,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION
-    'Зареєстроване повідомлення про подію не можна змінювати або видаляти';
+  RAISE EXCEPTION 'trip_incident_history_is_immutable';
 END;
 $$;
 
@@ -71,7 +88,49 @@ EXECUTE FUNCTION prevent_trip_incident_mutation();
 
 
 -- =========================================================
--- 3. REGISTRATION OF A NOTIFICATION
+-- 4. CHECK INCIDENT REPORTING AUTHORIZATION
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION user_can_report_trip_incident(
+  p_user_id UUID,
+  p_trip_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM trips t
+    JOIN employees e
+      ON e.id = t.driver_id
+    JOIN users u
+      ON u.id = e.user_id
+    WHERE t.id = p_trip_id
+      AND u.id = p_user_id
+      AND u.is_active = TRUE
+      AND u.deleted_at IS NULL
+      AND e.is_active = TRUE
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM users u
+    JOIN user_roles ur
+      ON ur.user_id = u.id
+    JOIN role_permissions rp
+      ON rp.role_id = ur.role_id
+    JOIN permissions p
+      ON p.id = rp.permission_id
+    WHERE u.id = p_user_id
+      AND u.is_active = TRUE
+      AND u.deleted_at IS NULL
+      AND p.code = 'trip_incident_report'
+  );
+$$;
+
+
+-- =========================================================
+-- 5. REGISTER A TRIP INCIDENT
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION report_trip_incident(
@@ -86,85 +145,73 @@ RETURNS UUID
 LANGUAGE plpgsql
 AS $$
 DECLARE
+  v_trip RECORD;
   v_incident_id UUID;
-  v_trip_status TEXT;
-  v_is_driver BOOLEAN;
 BEGIN
-  IF p_trip_id IS NULL OR p_user_id IS NULL THEN
-    RAISE EXCEPTION
-      'Необхідно вказати рейс та автора повідомлення';
+  IF p_trip_id IS NULL
+     OR p_user_id IS NULL THEN
+    RAISE EXCEPTION 'required_parameter_is_missing';
   END IF;
 
-  IF p_incident_type NOT IN (
-    'road_obstacle',
-    'vehicle_breakdown',
-    'accident',
-    'delay',
-    'route_condition',
-    'other'
-  ) THEN
-    RAISE EXCEPTION 'Невідомий тип події';
+  IF p_incident_type IS NULL
+     OR p_incident_type NOT IN (
+       'road_obstacle',
+       'vehicle_breakdown',
+       'accident',
+       'delay',
+       'route_condition',
+       'other'
+     ) THEN
+    RAISE EXCEPTION 'invalid_trip_incident_type';
   END IF;
 
   IF p_description IS NULL
      OR LENGTH(TRIM(p_description)) = 0
      OR LENGTH(p_description) > 2000 THEN
-    RAISE EXCEPTION
-      'Опис події обов’язковий (до 2000 символів)';
+    RAISE EXCEPTION 'invalid_trip_incident_description';
   END IF;
 
   IF p_comment IS NOT NULL
      AND LENGTH(p_comment) > 2000 THEN
-    RAISE EXCEPTION
-      'Коментар не може перевищувати 2000 символів';
+    RAISE EXCEPTION 'trip_incident_comment_too_long';
   END IF;
 
-  SELECT status
-  INTO v_trip_status
+  IF p_occurred_at IS NULL
+     OR p_occurred_at > NOW() THEN
+    RAISE EXCEPTION 'invalid_trip_incident_timestamp';
+  END IF;
+
+  SELECT
+    id,
+    status,
+    actual_departure_at
+  INTO v_trip
   FROM trips
   WHERE id = p_trip_id
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Рейс не знайдено';
+    RAISE EXCEPTION 'trip_not_found';
   END IF;
 
-  IF v_trip_status NOT IN ('ready', 'in_transit', 'delivered') THEN
-    RAISE EXCEPTION
-      'Повідомлення про подію можна зареєструвати лише для підготовленого або розпочатого рейсу';
-  END IF;
-
-  SELECT EXISTS (
-    SELECT 1
-    FROM trips t
-    JOIN employees e ON e.id = t.driver_id
-    WHERE t.id = p_trip_id
-      AND e.user_id = p_user_id
-      AND e.is_active = TRUE
-  )
-  INTO v_is_driver;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM users
-    WHERE id = p_user_id
-      AND is_active = TRUE
+  IF v_trip.status NOT IN (
+    'ready',
+    'in_transit',
+    'delivered'
   ) THEN
-    RAISE EXCEPTION
-      'Неактивний користувач не може реєструвати події';
+    RAISE EXCEPTION 'trip_incident_not_allowed_in_current_status';
   END IF;
 
-  IF NOT v_is_driver
-     AND NOT EXISTS (
-       SELECT 1
-       FROM user_roles ur
-       JOIN role_permissions rp ON rp.role_id = ur.role_id
-       JOIN permissions p ON p.id = rp.permission_id
-       WHERE ur.user_id = p_user_id
-         AND p.code = 'trip_incident_report'
-     ) THEN
-    RAISE EXCEPTION
-      'Недостатньо прав для реєстрації події цього рейсу';
+  IF NOT user_can_report_trip_incident(
+    p_user_id,
+    p_trip_id
+  ) THEN
+    RAISE EXCEPTION 'permission_denied';
+  END IF;
+
+  IF v_trip.status IN ('in_transit', 'delivered')
+     AND v_trip.actual_departure_at IS NULL THEN
+    RAISE EXCEPTION 'trip_departure_not_recorded';
   END IF;
 
   INSERT INTO trip_incidents (
@@ -180,23 +227,11 @@ BEGIN
     p_user_id,
     p_incident_type,
     TRIM(p_description),
-    p_comment,
-    COALESCE(p_occurred_at, NOW())
+    NULLIF(TRIM(p_comment), ''),
+    p_occurred_at
   )
   RETURNING id INTO v_incident_id;
 
   RETURN v_incident_id;
 END;
 $$;
-
-
--- =========================================================
--- 4. PERMISSION
--- =========================================================
-
-INSERT INTO permissions (code, name)
-VALUES (
-  'trip_incident_report',
-  'Реєстрація повідомлень про події під час рейсу'
-)
-ON CONFLICT (code) DO NOTHING;
