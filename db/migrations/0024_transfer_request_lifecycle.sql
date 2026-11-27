@@ -1,59 +1,68 @@
 -- =========================================================
--- 1. HISTORY OF APPLICATION STATUS CHANGES
+-- 1. TRANSFER REQUEST STATUS HISTORY
 -- =========================================================
 
 CREATE TABLE transfer_request_status_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  transfer_request_id UUID NOT NULL
-    REFERENCES transfer_requests(id),
+    transfer_request_id UUID NOT NULL
+        REFERENCES transfer_requests(id) ON DELETE RESTRICT,
 
-  old_status TEXT,
-  new_status TEXT NOT NULL,
+    old_status TEXT,
 
-  reason TEXT,
+    new_status TEXT NOT NULL,
 
-  changed_by UUID REFERENCES users(id),
+    reason TEXT,
 
-  changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    changed_by UUID
+        REFERENCES users(id) ON DELETE RESTRICT,
 
-  CONSTRAINT transfer_request_status_history_status_check
-    CHECK (
-      new_status IN (
-        'draft',
-        'pending',
-        'approved',
-        'in_progress',
-        'fulfilled',
-        'partially_fulfilled',
-        'cancelled'
-      )
-    ),
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT transfer_request_status_history_old_status_check
-    CHECK (
-      old_status IS NULL
-      OR old_status IN (
-        'draft',
-        'pending',
-        'approved',
-        'in_progress',
-        'fulfilled',
-        'partially_fulfilled',
-        'cancelled'
-      )
-    )
+    CONSTRAINT chk_transfer_request_status_history_new_status
+        CHECK (
+            new_status IN (
+                'draft',
+                'pending',
+                'approved',
+                'in_progress',
+                'fulfilled',
+                'partially_fulfilled',
+                'cancelled'
+            )
+        ),
+
+    CONSTRAINT chk_transfer_request_status_history_old_status
+        CHECK (
+            old_status IS NULL
+            OR old_status IN (
+                'draft',
+                'pending',
+                'approved',
+                'in_progress',
+                'fulfilled',
+                'partially_fulfilled',
+                'cancelled'
+            )
+        ),
+
+    CONSTRAINT chk_transfer_request_status_history_reason
+        CHECK (
+            reason IS NULL
+            OR LENGTH(BTRIM(reason)) <= 2000
+        )
 );
 
-CREATE INDEX transfer_request_status_history_request_idx
-  ON transfer_request_status_history(
-    transfer_request_id,
-    changed_at DESC
-  );
+
+CREATE INDEX idx_transfer_request_status_history_request
+    ON transfer_request_status_history(
+        transfer_request_id,
+        changed_at DESC
+    );
 
 
 -- =========================================================
--- 2. THE IMMUTABILITY OF HISTORY
+-- 2. IMMUTABLE STATUS HISTORY
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_transfer_request_status_history_mutation()
@@ -61,12 +70,12 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION
-    'Історія статусів заявки є незмінною';
+    RAISE EXCEPTION 'TRANSFER_REQUEST_STATUS_HISTORY_IMMUTABLE';
 END;
 $$;
 
-CREATE TRIGGER transfer_request_status_history_immutable
+
+CREATE TRIGGER trg_transfer_request_status_history_immutable
 BEFORE UPDATE OR DELETE
 ON transfer_request_status_history
 FOR EACH ROW
@@ -74,7 +83,7 @@ EXECUTE FUNCTION prevent_transfer_request_status_history_mutation();
 
 
 -- =========================================================
--- 3. VERIFICATION OF PERMITTED TRANSITIONS
+-- 3. VALIDATE STATUS TRANSITIONS
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION validate_transfer_request_status_transition()
@@ -82,54 +91,61 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+        RETURN NEW;
+    END IF;
+
+    IF OLD.status IN (
+        'fulfilled',
+        'partially_fulfilled',
+        'cancelled'
+    ) THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_TERMINAL_STATUS';
+    END IF;
+
+    IF OLD.status = 'draft'
+       AND NEW.status NOT IN (
+           'pending',
+           'cancelled'
+       ) THEN
+        RAISE EXCEPTION 'INVALID_TRANSFER_REQUEST_STATUS_TRANSITION';
+    END IF;
+
+    IF OLD.status = 'pending'
+       AND NEW.status NOT IN (
+           'approved',
+           'draft',
+           'cancelled'
+       ) THEN
+        RAISE EXCEPTION 'INVALID_TRANSFER_REQUEST_STATUS_TRANSITION';
+    END IF;
+
+    IF OLD.status = 'approved'
+       AND NEW.status NOT IN (
+           'in_progress',
+           'fulfilled',
+           'partially_fulfilled',
+           'cancelled'
+       ) THEN
+        RAISE EXCEPTION 'INVALID_TRANSFER_REQUEST_STATUS_TRANSITION';
+    END IF;
+
+    IF OLD.status = 'in_progress'
+       AND NEW.status NOT IN (
+           'approved',
+           'fulfilled',
+           'partially_fulfilled',
+           'cancelled'
+       ) THEN
+        RAISE EXCEPTION 'INVALID_TRANSFER_REQUEST_STATUS_TRANSITION';
+    END IF;
+
     RETURN NEW;
-  END IF;
-
-  IF OLD.status IN (
-    'fulfilled',
-    'partially_fulfilled',
-    'cancelled'
-  ) THEN
-    RAISE EXCEPTION
-      'Завершена заявка не може повертатися до попереднього статусу';
-  END IF;
-
-  IF OLD.status = 'draft'
-     AND NEW.status NOT IN ('pending', 'cancelled') THEN
-    RAISE EXCEPTION
-      'Недозволений перехід зі статусу draft';
-  END IF;
-
-  IF OLD.status = 'pending'
-     AND NEW.status NOT IN ('approved', 'draft', 'cancelled') THEN
-    RAISE EXCEPTION
-      'Недозволений перехід зі статусу pending';
-  END IF;
-
-  IF OLD.status = 'approved'
-     AND NEW.status NOT IN (
-       'in_progress',
-       'cancelled'
-     ) THEN
-    RAISE EXCEPTION
-      'Недозволений перехід зі статусу approved';
-  END IF;
-
-  IF OLD.status = 'in_progress'
-     AND NEW.status NOT IN (
-       'fulfilled',
-       'partially_fulfilled'
-     ) THEN
-    RAISE EXCEPTION
-      'Недозволений перехід зі статусу in_progress';
-  END IF;
-
-  RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER transfer_request_status_transition_guard
+
+CREATE TRIGGER trg_transfer_request_status_transition_guard
 BEFORE UPDATE OF status
 ON transfer_requests
 FOR EACH ROW
@@ -137,51 +153,39 @@ EXECUTE FUNCTION validate_transfer_request_status_transition();
 
 
 -- =========================================================
--- 4. AUTOMATIC RECORDING OF STATUS CHANGES
+-- 4. RECORD STATUS CHANGES
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION record_transfer_request_status_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  v_user_id UUID;
-  v_reason TEXT;
 BEGIN
-  IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+        RETURN NEW;
+    END IF;
+
+    INSERT INTO transfer_request_status_history (
+        transfer_request_id,
+        old_status,
+        new_status,
+        reason,
+        changed_by
+    )
+    VALUES (
+        NEW.id,
+        OLD.status,
+        NEW.status,
+        NULL,
+        NULL
+    );
+
     RETURN NEW;
-  END IF;
-
-  v_user_id := NULLIF(
-    current_setting('app.current_user_id', TRUE),
-    ''
-  )::UUID;
-
-  v_reason := NULLIF(
-    current_setting('app.status_change_reason', TRUE),
-    ''
-  );
-
-  INSERT INTO transfer_request_status_history (
-    transfer_request_id,
-    old_status,
-    new_status,
-    reason,
-    changed_by
-  )
-  VALUES (
-    NEW.id,
-    OLD.status,
-    NEW.status,
-    v_reason,
-    v_user_id
-  );
-
-  RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER transfer_request_status_history_insert
+
+CREATE TRIGGER trg_transfer_request_status_history_insert
 AFTER UPDATE OF status
 ON transfer_requests
 FOR EACH ROW
@@ -189,32 +193,28 @@ EXECUTE FUNCTION record_transfer_request_status_change();
 
 
 -- =========================================================
--- 5. PROHIBITION ON DELETING APPLICATIONS AFTER SUBMISSION
+-- 5. PREVENT TRANSFER REQUEST DELETION
 -- =========================================================
 
-CREATE OR REPLACE FUNCTION prevent_transfer_request_delete_after_submission()
+CREATE OR REPLACE FUNCTION prevent_transfer_request_deletion()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF OLD.status <> 'draft' THEN
-    RAISE EXCEPTION
-      'Видаляти можна лише чернетки заявок';
-  END IF;
-
-  RETURN OLD;
+    RAISE EXCEPTION 'TRANSFER_REQUEST_DELETION_NOT_ALLOWED';
 END;
 $$;
 
-CREATE TRIGGER transfer_request_delete_guard
+
+CREATE TRIGGER trg_transfer_request_delete_guard
 BEFORE DELETE
 ON transfer_requests
 FOR EACH ROW
-EXECUTE FUNCTION prevent_transfer_request_delete_after_submission();
+EXECUTE FUNCTION prevent_transfer_request_deletion();
 
 
 -- =========================================================
--- 6. PROHIBITION ON CHANGING KEY FIELDS AFTER SUBMISSION
+-- 6. PROTECT SUBMITTED REQUEST FIELDS
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION protect_submitted_transfer_request()
@@ -222,25 +222,26 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF OLD.status <> 'draft' THEN
-    IF NEW.destination_storage_point_id
-       IS DISTINCT FROM OLD.destination_storage_point_id THEN
-      RAISE EXCEPTION
-        'Не можна змінювати точку призначення після подання заявки';
+    IF OLD.status <> 'draft' THEN
+        IF NEW.destination_storage_point_id
+           IS DISTINCT FROM OLD.destination_storage_point_id THEN
+            RAISE EXCEPTION 'TRANSFER_REQUEST_DESTINATION_IMMUTABLE';
+        END IF;
+
+        IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
+            RAISE EXCEPTION 'TRANSFER_REQUEST_CREATOR_IMMUTABLE';
+        END IF;
     END IF;
 
-    IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
-      RAISE EXCEPTION
-        'Не можна змінювати автора заявки';
-    END IF;
-  END IF;
-
-  RETURN NEW;
+    RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER transfer_request_submitted_fields_guard
-BEFORE UPDATE
+
+CREATE TRIGGER trg_transfer_request_submitted_fields_guard
+BEFORE UPDATE OF
+    destination_storage_point_id,
+    created_by
 ON transfer_requests
 FOR EACH ROW
 EXECUTE FUNCTION protect_submitted_transfer_request();
