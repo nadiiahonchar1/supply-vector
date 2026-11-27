@@ -1,11 +1,12 @@
 -- =========================================================
--- 1. NOTIFICATION TABLE
+-- 1. NOTIFICATIONS
 -- =========================================================
 
 CREATE TABLE notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  user_id UUID NOT NULL REFERENCES users(id),
+  user_id UUID NOT NULL
+    REFERENCES users(id) ON DELETE RESTRICT,
 
   notification_type TEXT NOT NULL,
 
@@ -65,6 +66,25 @@ CREATE TABLE notifications (
       LENGTH(TRIM(message)) BETWEEN 1 AND 2000
     ),
 
+  CONSTRAINT notifications_reference_type_check
+    CHECK (
+      reference_type IS NULL
+      OR LENGTH(TRIM(reference_type)) BETWEEN 1 AND 50
+    ),
+
+  CONSTRAINT notifications_reference_pair_check
+    CHECK (
+      (reference_type IS NULL AND reference_id IS NULL)
+      OR
+      (reference_type IS NOT NULL AND reference_id IS NOT NULL)
+    ),
+
+  CONSTRAINT notifications_deduplication_key_check
+    CHECK (
+      deduplication_key IS NULL
+      OR LENGTH(TRIM(deduplication_key)) BETWEEN 1 AND 200
+    ),
+
   CONSTRAINT notifications_read_state_check
     CHECK (
       (is_read = FALSE AND read_at IS NULL)
@@ -95,7 +115,7 @@ CREATE UNIQUE INDEX notifications_deduplication_idx
 
 
 -- =========================================================
--- 3. CREATING A NOTIFICATION
+-- 3. CREATE A NOTIFICATION
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION create_notification(
@@ -115,7 +135,7 @@ DECLARE
   v_notification_id UUID;
 BEGIN
   IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'Необхідно вказати отримувача сповіщення';
+    RAISE EXCEPTION 'notification_recipient_required';
   END IF;
 
   IF NOT EXISTS (
@@ -123,49 +143,61 @@ BEGIN
     FROM users
     WHERE id = p_user_id
       AND is_active = TRUE
+      AND deleted_at IS NULL
   ) THEN
-    RAISE EXCEPTION
-      'Отримувач не існує або його обліковий запис неактивний';
+    RAISE EXCEPTION 'notification_recipient_unavailable';
   END IF;
 
-  IF p_notification_type NOT IN (
-    'transfer_request_submitted',
-    'transfer_request_approved',
-    'transfer_request_returned',
-    'transfer_request_cancelled',
-    'urgent_priority_decision',
-    'shipment_created',
-    'shipment_status_changed',
-    'trip_assigned',
-    'trip_route_changed',
-    'trip_delayed',
-    'trip_incident_reported',
-    'shipment_received',
-    'inventory_discrepancy',
-    'cargo_responsibility_transferred',
-    'salvage_request_created',
-    'salvage_request_decided',
-    'general'
-  ) THEN
-    RAISE EXCEPTION 'Невідомий тип сповіщення';
+  IF p_notification_type IS NULL
+     OR p_notification_type NOT IN (
+       'transfer_request_submitted',
+       'transfer_request_approved',
+       'transfer_request_returned',
+       'transfer_request_cancelled',
+       'urgent_priority_decision',
+       'shipment_created',
+       'shipment_status_changed',
+       'trip_assigned',
+       'trip_route_changed',
+       'trip_delayed',
+       'trip_incident_reported',
+       'shipment_received',
+       'inventory_discrepancy',
+       'cargo_responsibility_transferred',
+       'salvage_request_created',
+       'salvage_request_decided',
+       'general'
+     ) THEN
+    RAISE EXCEPTION 'invalid_notification_type';
   END IF;
 
-  IF p_priority NOT IN ('low', 'normal', 'high', 'urgent') THEN
-    RAISE EXCEPTION 'Невідомий пріоритет сповіщення';
+  IF p_priority IS NULL
+     OR p_priority NOT IN ('low', 'normal', 'high', 'urgent') THEN
+    RAISE EXCEPTION 'invalid_notification_priority';
   END IF;
 
   IF p_title IS NULL
-     OR LENGTH(TRIM(p_title)) = 0
-     OR LENGTH(p_title) > 200 THEN
-    RAISE EXCEPTION
-      'Заголовок сповіщення обов’язковий (до 200 символів)';
+     OR LENGTH(TRIM(p_title)) NOT BETWEEN 1 AND 200 THEN
+    RAISE EXCEPTION 'invalid_notification_title';
   END IF;
 
   IF p_message IS NULL
-     OR LENGTH(TRIM(p_message)) = 0
-     OR LENGTH(p_message) > 2000 THEN
-    RAISE EXCEPTION
-      'Текст сповіщення обов’язковий (до 2000 символів)';
+     OR LENGTH(TRIM(p_message)) NOT BETWEEN 1 AND 2000 THEN
+    RAISE EXCEPTION 'invalid_notification_message';
+  END IF;
+
+  IF p_reference_type IS NOT NULL
+     AND LENGTH(TRIM(p_reference_type)) NOT BETWEEN 1 AND 50 THEN
+    RAISE EXCEPTION 'invalid_notification_reference_type';
+  END IF;
+
+  IF (p_reference_type IS NULL) <> (p_reference_id IS NULL) THEN
+    RAISE EXCEPTION 'notification_reference_mismatch';
+  END IF;
+
+  IF p_deduplication_key IS NOT NULL
+     AND LENGTH(TRIM(p_deduplication_key)) NOT BETWEEN 1 AND 200 THEN
+    RAISE EXCEPTION 'invalid_notification_deduplication_key';
   END IF;
 
   INSERT INTO notifications (
@@ -184,9 +216,15 @@ BEGIN
     TRIM(p_title),
     TRIM(p_message),
     p_priority,
-    p_reference_type,
+    CASE
+      WHEN p_reference_type IS NULL THEN NULL
+      ELSE TRIM(p_reference_type)
+    END,
     p_reference_id,
-    p_deduplication_key
+    CASE
+      WHEN p_deduplication_key IS NULL THEN NULL
+      ELSE TRIM(p_deduplication_key)
+    END
   )
   ON CONFLICT (user_id, deduplication_key)
     WHERE deduplication_key IS NOT NULL
@@ -200,7 +238,11 @@ BEGIN
     INTO v_notification_id
     FROM notifications
     WHERE user_id = p_user_id
-      AND deduplication_key = p_deduplication_key;
+      AND deduplication_key = TRIM(p_deduplication_key);
+  END IF;
+
+  IF v_notification_id IS NULL THEN
+    RAISE EXCEPTION 'notification_creation_failed';
   END IF;
 
   RETURN v_notification_id;
@@ -209,7 +251,7 @@ $$;
 
 
 -- =========================================================
--- 4. MARKING A NOTIFICATION AS READ
+-- 4. MARK ONE NOTIFICATION AS READ
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION mark_notification_as_read(
@@ -219,26 +261,26 @@ CREATE OR REPLACE FUNCTION mark_notification_as_read(
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  v_updated BOOLEAN;
 BEGIN
+  IF p_notification_id IS NULL OR p_user_id IS NULL THEN
+    RAISE EXCEPTION 'notification_parameters_required';
+  END IF;
+
   UPDATE notifications
   SET
     is_read = TRUE,
-    read_at = COALESCE(read_at, NOW())
+    read_at = NOW()
   WHERE id = p_notification_id
     AND user_id = p_user_id
     AND is_read = FALSE;
 
-  v_updated := FOUND;
-
-  RETURN v_updated;
+  RETURN FOUND;
 END;
 $$;
 
 
 -- =========================================================
--- 5. MARK ALL NOTIFICATIONS AS READ
+-- 5. MARK ALL USER NOTIFICATIONS AS READ
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION mark_all_notifications_as_read(
@@ -250,6 +292,10 @@ AS $$
 DECLARE
   v_updated_count INTEGER;
 BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'notification_user_required';
+  END IF;
+
   UPDATE notifications
   SET
     is_read = TRUE,
@@ -265,25 +311,36 @@ $$;
 
 
 -- =========================================================
--- 6. NUMBER OF UNREAD NOTIFICATIONS
+-- 6. GET UNREAD NOTIFICATION COUNT
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION get_unread_notification_count(
   p_user_id UUID
 )
 RETURNS BIGINT
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 AS $$
+DECLARE
+  v_count BIGINT;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'notification_user_required';
+  END IF;
+
   SELECT COUNT(*)
+  INTO v_count
   FROM notifications
   WHERE user_id = p_user_id
     AND is_read = FALSE;
+
+  RETURN v_count;
+END;
 $$;
 
 
 -- =========================================================
--- 7. PROTECTION AGAINST MODIFICATION OF THIRD-PARTY NOTIFICATIONS
+-- 7. PROTECT NOTIFICATION CONTENT AND READ STATE
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION validate_notification_update()
@@ -300,13 +357,24 @@ BEGIN
      OR NEW.reference_id IS DISTINCT FROM OLD.reference_id
      OR NEW.deduplication_key IS DISTINCT FROM OLD.deduplication_key
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
-    RAISE EXCEPTION
-      'Вміст і отримувача сповіщення не можна змінювати';
+    RAISE EXCEPTION 'notification_content_is_immutable';
   END IF;
 
-  IF OLD.is_read = TRUE AND NEW.is_read = FALSE THEN
-    RAISE EXCEPTION
-      'Прочитане сповіщення не можна повернути до непрочитаного стану';
+  IF OLD.is_read = TRUE THEN
+    IF NEW.is_read IS DISTINCT FROM OLD.is_read
+       OR NEW.read_at IS DISTINCT FROM OLD.read_at THEN
+      RAISE EXCEPTION 'notification_read_state_is_final';
+    END IF;
+
+    RETURN NEW;
+  END IF;
+
+  IF NEW.is_read = FALSE AND NEW.read_at IS NOT NULL THEN
+    RAISE EXCEPTION 'invalid_notification_read_state';
+  END IF;
+
+  IF NEW.is_read = TRUE AND NEW.read_at IS NULL THEN
+    RAISE EXCEPTION 'notification_read_timestamp_required';
   END IF;
 
   RETURN NEW;
@@ -321,7 +389,7 @@ EXECUTE FUNCTION validate_notification_update();
 
 
 -- =========================================================
--- 8. PROHIBITION ON DELETING NOTIFICATIONS
+-- 8. PREVENT NOTIFICATION DELETION
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_notification_delete()
@@ -329,8 +397,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION
-    'Сповіщення не можна видаляти';
+  RAISE EXCEPTION 'notification_deletion_not_allowed';
 END;
 $$;
 
