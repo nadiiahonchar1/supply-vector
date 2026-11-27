@@ -1,39 +1,43 @@
 -- =========================================================
--- 1. HISTORY OF CHANGES IN DISTRIBUTION BETWEEN SOURCES
+-- 1. SOURCE ALLOCATION CHANGE HISTORY
 -- =========================================================
 
 CREATE TABLE transfer_request_source_allocation_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  transfer_request_source_id UUID NOT NULL
-    REFERENCES transfer_request_sources(id),
+    transfer_request_source_id UUID NOT NULL
+        REFERENCES transfer_request_sources(id) ON DELETE RESTRICT,
 
-  old_quantity INTEGER NOT NULL CHECK (old_quantity > 0),
+    old_quantity INTEGER NOT NULL
+        CHECK (old_quantity > 0),
 
-  new_quantity INTEGER NOT NULL CHECK (new_quantity > 0),
+    new_quantity INTEGER NOT NULL
+        CHECK (new_quantity > 0),
 
-  reason TEXT NOT NULL
-    CHECK (LENGTH(TRIM(reason)) BETWEEN 1 AND 2000),
+    reason TEXT NOT NULL
+        CHECK (LENGTH(BTRIM(reason)) BETWEEN 1 AND 2000),
 
-  operation_key UUID NOT NULL UNIQUE,
+    operation_key UUID NOT NULL UNIQUE,
 
-  changed_by UUID NOT NULL REFERENCES users(id),
+    changed_by UUID NOT NULL
+        REFERENCES users(id) ON DELETE RESTRICT,
 
-  changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT source_allocation_history_values_differ
-    CHECK (old_quantity <> new_quantity)
+    CONSTRAINT chk_source_allocation_history_values_differ
+        CHECK (old_quantity <> new_quantity)
 );
 
-CREATE INDEX source_allocation_history_source_idx
-  ON transfer_request_source_allocation_history(
-    transfer_request_source_id,
-    changed_at DESC
-  );
+
+CREATE INDEX idx_source_allocation_history_source
+    ON transfer_request_source_allocation_history(
+        transfer_request_source_id,
+        changed_at DESC
+    );
 
 
 -- =========================================================
--- 2. DEFENDING HISTORY
+-- 2. IMMUTABLE SOURCE ALLOCATION HISTORY
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION prevent_source_allocation_history_mutation()
@@ -41,12 +45,12 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION
-    'Історія розподілу між джерелами є незмінною';
+    RAISE EXCEPTION 'SOURCE_ALLOCATION_HISTORY_IMMUTABLE';
 END;
 $$;
 
-CREATE TRIGGER source_allocation_history_immutable
+
+CREATE TRIGGER trg_source_allocation_history_immutable
 BEFORE UPDATE OR DELETE
 ON transfer_request_source_allocation_history
 FOR EACH ROW
@@ -54,284 +58,67 @@ EXECUTE FUNCTION prevent_source_allocation_history_mutation();
 
 
 -- =========================================================
--- 3. CORRECTION OF THE APPLICATION QUANTITY PROTECTION
+-- 3. VALIDATE TOTAL SOURCE ALLOCATION
 -- =========================================================
-
-CREATE OR REPLACE FUNCTION prevent_direct_request_quantity_update()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF NEW.requested_quantity IS DISTINCT FROM OLD.requested_quantity
-     AND current_setting(
-       'app.allow_request_quantity_update',
-       TRUE
-     ) IS DISTINCT FROM 'on' THEN
-
-    RAISE EXCEPTION
-      'Зміну кількості потрібно виконувати через спеціальну функцію';
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
-
-
--- =========================================================
--- 4. UPDATED NEED CHANGE FUNCTION
--- =========================================================
-
-CREATE OR REPLACE FUNCTION change_transfer_request_item_quantity(
-  p_transfer_request_item_id UUID,
-  p_new_quantity INTEGER,
-  p_user_id UUID,
-  p_operation_key UUID,
-  p_reason TEXT
-)
-RETURNS UUID
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_item RECORD;
-  v_request RECORD;
-
-  v_existing_id UUID;
-  v_history_id UUID;
-
-  v_received BIGINT := 0;
-  v_loaded BIGINT := 0;
-  v_resolved BIGINT := 0;
-  v_unresolved_loaded BIGINT := 0;
-
-  v_active_reserved BIGINT := 0;
-  v_allocated BIGINT := 0;
-  v_minimum_quantity BIGINT := 0;
-BEGIN
-  IF p_new_quantity IS NULL OR p_new_quantity <= 0 THEN
-    RAISE EXCEPTION 'Нова кількість повинна бути більшою за нуль';
-  END IF;
-
-  IF p_operation_key IS NULL THEN
-    RAISE EXCEPTION 'operation_key є обов’язковим';
-  END IF;
-
-  IF NULLIF(TRIM(p_reason), '') IS NULL THEN
-    RAISE EXCEPTION 'Необхідно вказати причину зміни';
-  END IF;
-
-  SELECT id
-  INTO v_existing_id
-  FROM transfer_request_item_quantity_history
-  WHERE operation_key = p_operation_key;
-
-  IF v_existing_id IS NOT NULL THEN
-    RETURN v_existing_id;
-  END IF;
-
-  SELECT *
-  INTO v_item
-  FROM transfer_request_items
-  WHERE id = p_transfer_request_item_id
-  FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Позицію заявки не знайдено';
-  END IF;
-
-  SELECT *
-  INTO v_request
-  FROM transfer_requests
-  WHERE id = v_item.transfer_request_id
-  FOR UPDATE;
-
-  IF v_request.status NOT IN ('approved', 'in_progress') THEN
-    RAISE EXCEPTION
-      'Змінювати кількість можна лише в погодженій або виконуваній заявці';
-  END IF;
-
-  IF p_new_quantity = v_item.requested_quantity THEN
-    RAISE EXCEPTION 'Нова кількість збігається з поточною';
-  END IF;
-
-  SELECT COALESCE(SUM(srm.quantity), 0)
-  INTO v_received
-  FROM shipment_receipt_movements srm
-  JOIN shipment_items si ON si.id = srm.shipment_item_id
-  JOIN transfer_request_sources trs
-    ON trs.id = si.transfer_request_source_id
-  WHERE trs.transfer_request_item_id = p_transfer_request_item_id;
-
-  SELECT COALESCE(SUM(slm.quantity), 0)
-  INTO v_loaded
-  FROM shipment_loading_movements slm
-  JOIN shipment_items si ON si.id = slm.shipment_item_id
-  JOIN transfer_request_sources trs
-    ON trs.id = si.transfer_request_source_id
-  WHERE trs.transfer_request_item_id = p_transfer_request_item_id;
-
-  SELECT COALESCE(SUM(scm.quantity), 0)
-  INTO v_resolved
-  FROM shipment_cargo_movements scm
-  JOIN shipment_items si ON si.id = scm.shipment_item_id
-  JOIN transfer_request_sources trs
-    ON trs.id = si.transfer_request_source_id
-  WHERE trs.transfer_request_item_id = p_transfer_request_item_id;
-
-  v_unresolved_loaded := v_loaded - v_received - v_resolved;
-
-  IF v_unresolved_loaded < 0 THEN
-    RAISE EXCEPTION 'Некоректний баланс завантаженого товару';
-  END IF;
-
-  SELECT COALESCE(
-    SUM(
-      ir.reserved_quantity
-      - ir.consumed_quantity
-      - ir.released_quantity
-    ),
-    0
-  )
-  INTO v_active_reserved
-  FROM inventory_reservations ir
-  JOIN transfer_request_sources trs
-    ON trs.id = ir.transfer_request_source_id
-  WHERE trs.transfer_request_item_id = p_transfer_request_item_id;
-
-  SELECT COALESCE(SUM(allocated_quantity), 0)
-  INTO v_allocated
-  FROM transfer_request_sources
-  WHERE transfer_request_item_id = p_transfer_request_item_id;
-
-  v_minimum_quantity :=
-    v_received
-    + v_unresolved_loaded
-    + v_active_reserved
-    + v_item.cancelled_quantity;
-
-  IF p_new_quantity < v_minimum_quantity THEN
-    RAISE EXCEPTION
-      'Нова кількість нижча за вже отриману, завантажену, зарезервовану або скасовану кількість';
-  END IF;
-
-  IF p_new_quantity < v_allocated THEN
-    RAISE EXCEPTION
-      'Спочатку скоригуйте розподіл між джерелами';
-  END IF;
-
-  PERFORM set_config(
-    'app.allow_request_quantity_update',
-    'on',
-    TRUE
-  );
-
-  UPDATE transfer_request_items
-  SET requested_quantity = p_new_quantity
-  WHERE id = p_transfer_request_item_id;
-
-  PERFORM set_config(
-    'app.allow_request_quantity_update',
-    'off',
-    TRUE
-  );
-
-  INSERT INTO transfer_request_item_quantity_history (
-    transfer_request_item_id,
-    old_quantity,
-    new_quantity,
-    change_reason,
-    operation_key,
-    changed_by
-  )
-  VALUES (
-    p_transfer_request_item_id,
-    v_item.requested_quantity,
-    p_new_quantity,
-    TRIM(p_reason),
-    p_operation_key,
-    p_user_id
-  )
-  RETURNING id INTO v_history_id;
-
-  RETURN v_history_id;
-END;
-$$;
-
-
--- =========================================================
--- 5. CORRECTION OF THE DISTRIBUTION SUM CHECK
--- =========================================================
-
-DROP TRIGGER IF EXISTS transfer_request_source_allocation_guard
-ON transfer_request_sources;
 
 CREATE OR REPLACE FUNCTION validate_transfer_request_source_allocation()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_item_id UUID;
-  v_requested_quantity INTEGER;
-  v_allocated_quantity BIGINT;
+    v_item_id UUID;
+    v_requested_quantity INTEGER;
+    v_allocated_quantity BIGINT;
 BEGIN
-  IF TG_OP = 'DELETE' THEN
-    v_item_id := OLD.transfer_request_item_id;
-  ELSE
-    v_item_id := NEW.transfer_request_item_id;
-  END IF;
+    IF TG_OP = 'DELETE' THEN
+        v_item_id := OLD.transfer_request_item_id;
+    ELSE
+        v_item_id := NEW.transfer_request_item_id;
+    END IF;
 
-  SELECT requested_quantity
-  INTO v_requested_quantity
-  FROM transfer_request_items
-  WHERE id = v_item_id
-  FOR UPDATE;
+    IF TG_OP = 'UPDATE'
+       AND NEW.transfer_request_item_id
+           IS DISTINCT FROM OLD.transfer_request_item_id THEN
+        RAISE EXCEPTION 'SOURCE_ITEM_REASSIGNMENT_NOT_ALLOWED';
+    END IF;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Позицію заявки не знайдено';
-  END IF;
+    SELECT requested_quantity
+    INTO v_requested_quantity
+    FROM transfer_request_items
+    WHERE id = v_item_id
+    FOR UPDATE;
 
-  IF TG_OP = 'INSERT' THEN
-    SELECT COALESCE(SUM(allocated_quantity), 0)
-    INTO v_allocated_quantity
-    FROM transfer_request_sources
-    WHERE transfer_request_item_id = v_item_id;
-
-    v_allocated_quantity :=
-      v_allocated_quantity + NEW.allocated_quantity;
-
-  ELSIF TG_OP = 'UPDATE' THEN
-    IF NEW.transfer_request_item_id <>
-       OLD.transfer_request_item_id THEN
-      RAISE EXCEPTION
-        'Переносити джерело між позиціями заявки заборонено';
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_ITEM_NOT_FOUND';
     END IF;
 
     SELECT COALESCE(SUM(allocated_quantity), 0)
     INTO v_allocated_quantity
     FROM transfer_request_sources
     WHERE transfer_request_item_id = v_item_id
-      AND id <> OLD.id;
+      AND (
+          TG_OP = 'INSERT'
+          OR id <> OLD.id
+      );
 
-    v_allocated_quantity :=
-      v_allocated_quantity + NEW.allocated_quantity;
+    IF TG_OP <> 'DELETE' THEN
+        v_allocated_quantity :=
+            v_allocated_quantity + NEW.allocated_quantity;
+    END IF;
 
-  ELSE
-    SELECT COALESCE(SUM(allocated_quantity), 0)
-    INTO v_allocated_quantity
-    FROM transfer_request_sources
-    WHERE transfer_request_item_id = v_item_id
-      AND id <> OLD.id;
-  END IF;
+    IF v_allocated_quantity > v_requested_quantity THEN
+        RAISE EXCEPTION 'SOURCE_ALLOCATION_EXCEEDS_REQUESTED_QUANTITY';
+    END IF;
 
-  IF v_allocated_quantity > v_requested_quantity THEN
-    RAISE EXCEPTION
-      'Сума розподілу перевищує потребу позиції заявки';
-  END IF;
-
-  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    RETURN CASE
+        WHEN TG_OP = 'DELETE' THEN OLD
+        ELSE NEW
+    END;
 END;
 $$;
 
-CREATE TRIGGER transfer_request_source_allocation_guard
+
+CREATE TRIGGER trg_transfer_request_source_allocation_guard
 BEFORE INSERT OR UPDATE OR DELETE
 ON transfer_request_sources
 FOR EACH ROW
@@ -339,163 +126,220 @@ EXECUTE FUNCTION validate_transfer_request_source_allocation();
 
 
 -- =========================================================
--- 6. PROTECTION OF A SOURCE ALREADY INVOLVED IN LOGISTICS
+-- 4. VALIDATE SOURCE ALLOCATION AGAINST LOGISTICS
 -- =========================================================
 
-CREATE OR REPLACE FUNCTION protect_logistically_used_request_source()
-RETURNS TRIGGER
+CREATE OR REPLACE FUNCTION validate_source_allocation_logistics(
+    p_source_id UUID,
+    p_new_quantity INTEGER
+)
+RETURNS VOID
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_active_reserved BIGINT := 0;
+    v_loaded_quantity BIGINT := 0;
+    v_unloaded_quantity BIGINT := 0;
+    v_committed_quantity BIGINT := 0;
 BEGIN
-  IF TG_OP = 'DELETE' OR
-     NEW.storage_point_id IS DISTINCT FROM OLD.storage_point_id OR
-     NEW.transfer_request_item_id IS DISTINCT FROM OLD.transfer_request_item_id OR
-     NEW.allocated_quantity IS DISTINCT FROM OLD.allocated_quantity
-  THEN
-    IF EXISTS (
-      SELECT 1
-      FROM inventory_reservations
-      WHERE transfer_request_source_id = OLD.id
-    ) THEN
-      RAISE EXCEPTION
-        'Джерело має історію резервування. Змінювати його заборонено';
+    SELECT COALESCE(
+        SUM(
+            ir.reserved_quantity
+            - ir.consumed_quantity
+            - ir.released_quantity
+        ),
+        0
+    )
+    INTO v_active_reserved
+    FROM inventory_reservations ir
+    WHERE ir.transfer_request_source_id = p_source_id;
+
+    SELECT
+        COALESCE(
+            SUM(sco.quantity) FILTER (
+                WHERE sco.operation_type = 'load'
+            ),
+            0
+        ),
+        COALESCE(
+            SUM(sco.quantity) FILTER (
+                WHERE sco.operation_type = 'unload_before_departure'
+            ),
+            0
+        )
+    INTO
+        v_loaded_quantity,
+        v_unloaded_quantity
+    FROM shipment_cargo_operations sco
+    JOIN shipment_items si
+        ON si.id = sco.shipment_item_id
+    WHERE si.transfer_request_source_id = p_source_id;
+
+    v_committed_quantity :=
+        v_loaded_quantity - v_unloaded_quantity;
+
+    IF v_committed_quantity < 0 THEN
+        RAISE EXCEPTION 'INVALID_SOURCE_CARGO_BALANCE';
     END IF;
 
-    IF EXISTS (
-      SELECT 1
-      FROM shipment_items
-      WHERE transfer_request_source_id = OLD.id
-    ) THEN
-      RAISE EXCEPTION
-        'Джерело вже використане у відправленні. Змінювати його заборонено';
+    IF v_active_reserved < 0 THEN
+        RAISE EXCEPTION 'INVALID_SOURCE_RESERVATION_BALANCE';
     END IF;
-  END IF;
 
-  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    IF p_new_quantity <
+       GREATEST(v_active_reserved, v_committed_quantity) THEN
+        RAISE EXCEPTION 'SOURCE_ALLOCATION_BELOW_LOGISTIC_COMMITMENT';
+    END IF;
 END;
 $$;
 
-CREATE TRIGGER protect_logistically_used_request_source_guard
-BEFORE UPDATE OR DELETE
-ON transfer_request_sources
-FOR EACH ROW
-EXECUTE FUNCTION protect_logistically_used_request_source();
-
 
 -- =========================================================
--- 7. CONTROLLED CHANGE IN SOURCE QUANTITY
+-- 5. CHANGE SOURCE ALLOCATION
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION change_transfer_request_source_allocation(
-  p_source_id UUID,
-  p_new_quantity INTEGER,
-  p_user_id UUID,
-  p_operation_key UUID,
-  p_reason TEXT
+    p_source_id UUID,
+    p_new_quantity INTEGER,
+    p_user_id UUID,
+    p_operation_key UUID,
+    p_reason TEXT
 )
 RETURNS UUID
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_source RECORD;
-  v_existing_id UUID;
-  v_history_id UUID;
-  v_total_other BIGINT;
-  v_requested INTEGER;
+    v_source RECORD;
+    v_item RECORD;
+    v_request RECORD;
+    v_existing RECORD;
+
+    v_total_other BIGINT := 0;
+    v_history_id UUID;
 BEGIN
-  IF p_new_quantity IS NULL OR p_new_quantity <= 0 THEN
-    RAISE EXCEPTION
-      'Кількість розподілу повинна бути більшою за нуль';
-  END IF;
+    IF p_new_quantity IS NULL OR p_new_quantity <= 0 THEN
+        RAISE EXCEPTION 'INVALID_QUANTITY';
+    END IF;
 
-  IF p_operation_key IS NULL THEN
-    RAISE EXCEPTION 'operation_key є обов’язковим';
-  END IF;
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'ACTOR_REQUIRED';
+    END IF;
 
-  IF NULLIF(TRIM(p_reason), '') IS NULL THEN
-    RAISE EXCEPTION 'Необхідно вказати причину зміни';
-  END IF;
+    IF p_operation_key IS NULL THEN
+        RAISE EXCEPTION 'IDEMPOTENCY_KEY_REQUIRED';
+    END IF;
 
-  SELECT id
-  INTO v_existing_id
-  FROM transfer_request_source_allocation_history
-  WHERE operation_key = p_operation_key;
+    IF NULLIF(BTRIM(p_reason), '') IS NULL THEN
+        RAISE EXCEPTION 'CHANGE_REASON_REQUIRED';
+    END IF;
 
-  IF v_existing_id IS NOT NULL THEN
-    RETURN v_existing_id;
-  END IF;
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(p_operation_key::TEXT, 0)
+    );
 
-  SELECT *
-  INTO v_source
-  FROM transfer_request_sources
-  WHERE id = p_source_id
-  FOR UPDATE;
+    SELECT *
+    INTO v_existing
+    FROM transfer_request_source_allocation_history
+    WHERE operation_key = p_operation_key;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Джерело заявки не знайдено';
-  END IF;
+    IF FOUND THEN
+        IF v_existing.transfer_request_source_id <> p_source_id
+           OR v_existing.new_quantity <> p_new_quantity
+           OR v_existing.changed_by <> p_user_id
+           OR v_existing.reason <> BTRIM(p_reason) THEN
+            RAISE EXCEPTION 'IDEMPOTENCY_KEY_REUSED';
+        END IF;
 
-  PERFORM 1
-  FROM transfer_request_items
-  WHERE id = v_source.transfer_request_item_id
-  FOR UPDATE;
+        RETURN v_existing.id;
+    END IF;
+    
+    SELECT transfer_request_item_id
+    INTO v_item.id
+    FROM transfer_request_sources
+    WHERE id = p_source_id;
 
-  SELECT requested_quantity
-  INTO v_requested
-  FROM transfer_request_items
-  WHERE id = v_source.transfer_request_item_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_SOURCE_NOT_FOUND';
+    END IF;
+   
+    SELECT *
+    INTO v_item
+    FROM transfer_request_items
+    WHERE id = v_item.id
+    FOR UPDATE;
 
-  IF EXISTS (
-    SELECT 1
-    FROM inventory_reservations
-    WHERE transfer_request_source_id = p_source_id
-  ) THEN
-    RAISE EXCEPTION
-      'Джерело вже має резерви. Спочатку потрібно завершити або звільнити їх';
-  END IF;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_ITEM_NOT_FOUND';
+    END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM shipment_items
-    WHERE transfer_request_source_id = p_source_id
-  ) THEN
-    RAISE EXCEPTION
-      'Джерело вже використане у відправленні. Зміна заборонена';
-  END IF;
+    SELECT *
+    INTO v_request
+    FROM transfer_requests
+    WHERE id = v_item.transfer_request_id
+    FOR UPDATE;
 
-  SELECT COALESCE(SUM(allocated_quantity), 0)
-  INTO v_total_other
-  FROM transfer_request_sources
-  WHERE transfer_request_item_id = v_source.transfer_request_item_id
-    AND id <> p_source_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_NOT_FOUND';
+    END IF;
 
-  IF v_total_other + p_new_quantity > v_requested THEN
-    RAISE EXCEPTION
-      'Нова кількість перевищує залишок потреби позиції заявки';
-  END IF;
+    IF v_request.status NOT IN ('draft', 'approved', 'in_progress') THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_NOT_EDITABLE';
+    END IF;
 
-  UPDATE transfer_request_sources
-  SET allocated_quantity = p_new_quantity
-  WHERE id = p_source_id;
+    SELECT *
+    INTO v_source
+    FROM transfer_request_sources
+    WHERE id = p_source_id
+      AND transfer_request_item_id = v_item.id
+    FOR UPDATE;
 
-  INSERT INTO transfer_request_source_allocation_history (
-    transfer_request_source_id,
-    old_quantity,
-    new_quantity,
-    reason,
-    operation_key,
-    changed_by
-  )
-  VALUES (
-    p_source_id,
-    v_source.allocated_quantity,
-    p_new_quantity,
-    TRIM(p_reason),
-    p_operation_key,
-    p_user_id
-  )
-  RETURNING id INTO v_history_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'TRANSFER_REQUEST_SOURCE_NOT_FOUND';
+    END IF;
 
-  RETURN v_history_id;
+    IF p_new_quantity = v_source.allocated_quantity THEN
+        RAISE EXCEPTION 'QUANTITY_UNCHANGED';
+    END IF;
+
+    SELECT COALESCE(SUM(allocated_quantity), 0)
+    INTO v_total_other
+    FROM transfer_request_sources
+    WHERE transfer_request_item_id = v_item.id
+      AND id <> p_source_id;
+
+    IF v_total_other + p_new_quantity > v_item.requested_quantity THEN
+        RAISE EXCEPTION 'SOURCE_ALLOCATION_EXCEEDS_REQUESTED_QUANTITY';
+    END IF;
+
+    PERFORM validate_source_allocation_logistics(
+        p_source_id,
+        p_new_quantity
+    );
+
+    UPDATE transfer_request_sources
+    SET
+        allocated_quantity = p_new_quantity,
+        updated_at = NOW()
+    WHERE id = p_source_id;
+
+    INSERT INTO transfer_request_source_allocation_history (
+        transfer_request_source_id,
+        old_quantity,
+        new_quantity,
+        reason,
+        operation_key,
+        changed_by
+    )
+    VALUES (
+        p_source_id,
+        v_source.allocated_quantity,
+        p_new_quantity,
+        BTRIM(p_reason),
+        p_operation_key,
+        p_user_id
+    )
+    RETURNING id INTO v_history_id;
+
+    RETURN v_history_id;
 END;
 $$;
