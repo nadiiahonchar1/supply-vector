@@ -1,5 +1,5 @@
 -- =========================================================
--- 1. PRODUCT STOCK AND AVAILABILITY
+-- 1. INVENTORY OVERVIEW
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_inventory_overview AS
@@ -28,14 +28,16 @@ SELECT
   i.updated_at
 
 FROM inventory i
+
 JOIN storage_points sp
   ON sp.id = i.storage_point_id
+
 JOIN products p
   ON p.id = i.product_id;
 
 
 -- =========================================================
--- 2. GENERAL APPLICATION STATISTICS
+-- 2. TRANSFER REQUEST OVERVIEW
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_transfer_request_overview AS
@@ -67,7 +69,7 @@ SELECT
 FROM transfer_requests tr
 
 LEFT JOIN transfer_request_items tri
-  ON tri.request_id = tr.id
+  ON tri.transfer_request_id = tr.id
 
 LEFT JOIN transfer_request_sources trs
   ON trs.transfer_request_item_id = tri.id
@@ -85,7 +87,7 @@ GROUP BY
 
 
 -- =========================================================
--- 3. SHIPPING STATISTICS
+-- 3. SHIPMENT OVERVIEW
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_shipment_overview AS
@@ -107,10 +109,13 @@ SELECT
     0
   ) AS planned_quantity,
 
-  COALESCE(loading.loaded_quantity, 0)
+  COALESCE(cargo.loaded_quantity, 0)
     AS loaded_quantity,
 
-  COALESCE(receiving.received_quantity, 0)
+  COALESCE(cargo.unloaded_quantity, 0)
+    AS unloaded_before_departure_quantity,
+
+  COALESCE(cargo.received_quantity, 0)
     AS received_quantity,
 
   COALESCE(cargo.returned_quantity, 0)
@@ -119,11 +124,14 @@ SELECT
   COALESCE(cargo.lost_quantity, 0)
     AS lost_quantity,
 
-  COALESCE(cargo.writeoff_quantity, 0)
+  COALESCE(cargo.written_off_quantity, 0)
     AS written_off_quantity,
 
   COALESCE(cargo.transferred_quantity, 0)
-    AS responsibility_transferred_quantity
+    AS responsibility_transferred_quantity,
+
+  COALESCE(cargo.unresolved_quantity, 0)
+    AS unresolved_quantity
 
 FROM shipments s
 
@@ -133,48 +141,62 @@ LEFT JOIN shipment_items si
 LEFT JOIN (
   SELECT
     si.shipment_id,
-    SUM(lm.quantity) AS loaded_quantity
-  FROM shipment_loading_movements lm
-  JOIN shipment_items si
-    ON si.id = lm.shipment_item_id
-  GROUP BY si.shipment_id
-) loading
-  ON loading.shipment_id = s.id
 
-LEFT JOIN (
-  SELECT
-    si.shipment_id,
-    SUM(rm.quantity) AS received_quantity
-  FROM shipment_receipt_movements rm
-  JOIN shipment_items si
-    ON si.id = rm.shipment_item_id
-  GROUP BY si.shipment_id
-) receiving
-  ON receiving.shipment_id = s.id
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'load'
+    ) AS loaded_quantity,
 
-LEFT JOIN (
-  SELECT
-    si.shipment_id,
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'unload_before_departure'
+    ) AS unloaded_quantity,
 
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'return'
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'receive'
+    ) AS received_quantity,
+
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'return'
     ) AS returned_quantity,
 
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'loss'
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'loss'
     ) AS lost_quantity,
 
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'writeoff'
-    ) AS writeoff_quantity,
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'writeoff'
+    ) AS written_off_quantity,
 
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'responsibility_transfer'
-    ) AS transferred_quantity
+    SUM(co.quantity) FILTER (
+      WHERE co.operation_type = 'responsibility_transfer'
+    ) AS transferred_quantity,
 
-  FROM shipment_cargo_movements m
-  JOIN shipment_items si
-    ON si.id = m.shipment_item_id
+    (
+      COALESCE(
+        SUM(co.quantity) FILTER (
+          WHERE co.operation_type = 'load'
+        ),
+        0
+      )
+      -
+      COALESCE(
+        SUM(co.quantity) FILTER (
+          WHERE co.operation_type IN (
+            'unload_before_departure',
+            'receive',
+            'return',
+            'loss',
+            'writeoff'
+          )
+        ),
+        0
+      )
+    ) AS unresolved_quantity
+
+  FROM shipment_items si
+
+  LEFT JOIN shipment_cargo_operations co
+    ON co.shipment_item_id = si.id
+
   GROUP BY si.shipment_id
 ) cargo
   ON cargo.shipment_id = s.id
@@ -189,16 +211,18 @@ GROUP BY
   s.status,
   s.created_by,
   s.created_at,
-  loading.loaded_quantity,
-  receiving.received_quantity,
+  cargo.loaded_quantity,
+  cargo.unloaded_quantity,
+  cargo.received_quantity,
   cargo.returned_quantity,
   cargo.lost_quantity,
-  cargo.writeoff_quantity,
-  cargo.transferred_quantity;
+  cargo.written_off_quantity,
+  cargo.transferred_quantity,
+  cargo.unresolved_quantity;
 
 
 -- =========================================================
--- 4. FLIGHT STATUS
+-- 4. TRIP OVERVIEW
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_trip_overview AS
@@ -224,7 +248,9 @@ SELECT
     WHERE ts.actual_departure_at IS NOT NULL
   ) AS departed_stop_count,
 
-  COUNT(DISTINCT s.id) AS shipment_count
+  COUNT(DISTINCT s.id) AS shipment_count,
+
+  COUNT(DISTINCT ti.id) AS incident_count
 
 FROM trips t
 
@@ -233,6 +259,9 @@ LEFT JOIN trip_stops ts
 
 LEFT JOIN shipments s
   ON s.trip_id = t.id
+
+LEFT JOIN trip_incidents ti
+  ON ti.trip_id = t.id
 
 GROUP BY
   t.id,
@@ -248,7 +277,7 @@ GROUP BY
 
 
 -- =========================================================
--- 5. TRAFFIC CONGESTION
+-- 5. TRIP CARGO UTILIZATION
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_trip_cargo_utilization AS
@@ -263,18 +292,18 @@ SELECT
   v.max_weight_kg,
   v.max_volume_m3,
 
-  COALESCE(cargo.total_weight_kg, 0)
+  COALESCE(cargo.loaded_weight_kg, 0)
     AS loaded_weight_kg,
 
-  COALESCE(cargo.total_volume_m3, 0)
+  COALESCE(cargo.loaded_volume_m3, 0)
     AS loaded_volume_m3,
 
   CASE
     WHEN v.max_weight_kg IS NULL
-      OR v.max_weight_kg = 0
+      OR v.max_weight_kg <= 0
     THEN NULL
     ELSE ROUND(
-      COALESCE(cargo.total_weight_kg, 0)
+      COALESCE(cargo.loaded_weight_kg, 0)
       / v.max_weight_kg * 100,
       2
     )
@@ -282,10 +311,10 @@ SELECT
 
   CASE
     WHEN v.max_volume_m3 IS NULL
-      OR v.max_volume_m3 = 0
+      OR v.max_volume_m3 <= 0
     THEN NULL
     ELSE ROUND(
-      COALESCE(cargo.total_volume_m3, 0)
+      COALESCE(cargo.loaded_volume_m3, 0)
       / v.max_volume_m3 * 100,
       2
     )
@@ -301,27 +330,55 @@ LEFT JOIN (
     s.trip_id,
 
     SUM(
-      lm.quantity * p.weight_kg
+      (
+        CASE
+          WHEN co.operation_type = 'load'
+            THEN co.quantity
+          WHEN co.operation_type IN (
+            'unload_before_departure',
+            'receive',
+            'return',
+            'loss',
+            'writeoff'
+          )
+            THEN -co.quantity
+          ELSE 0
+        END
+      ) * p.weight_kg
     ) FILTER (
       WHERE p.weight_kg IS NOT NULL
-    ) AS total_weight_kg,
+    ) AS loaded_weight_kg,
 
     SUM(
-      lm.quantity * p.volume_m3
+      (
+        CASE
+          WHEN co.operation_type = 'load'
+            THEN co.quantity
+          WHEN co.operation_type IN (
+            'unload_before_departure',
+            'receive',
+            'return',
+            'loss',
+            'writeoff'
+          )
+            THEN -co.quantity
+          ELSE 0
+        END
+      ) * p.volume_m3
     ) FILTER (
       WHERE p.volume_m3 IS NOT NULL
-    ) AS total_volume_m3
+    ) AS loaded_volume_m3
 
   FROM shipments s
 
   JOIN shipment_items si
     ON si.shipment_id = s.id
 
-  JOIN shipment_loading_movements lm
-    ON lm.shipment_item_id = si.id
-
   JOIN products p
     ON p.id = si.product_id
+
+  JOIN shipment_cargo_operations co
+    ON co.shipment_item_id = si.id
 
   WHERE s.trip_id IS NOT NULL
 
@@ -331,7 +388,7 @@ LEFT JOIN (
 
 
 -- =========================================================
--- 6. UNRESOLVED CARGO ISSUES
+-- 6. UNRESOLVED SHIPMENT CARGO
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_unresolved_shipment_cargo AS
@@ -347,10 +404,11 @@ SELECT
   p.name AS product_name,
 
   balance.loaded_quantity,
+  balance.unloaded_quantity,
   balance.received_quantity,
   balance.returned_quantity,
   balance.lost_quantity,
-  balance.writeoff_quantity,
+  balance.written_off_quantity,
   balance.transferred_quantity,
   balance.unresolved_quantity
 
@@ -362,14 +420,88 @@ JOIN shipments s
 JOIN products p
   ON p.id = si.product_id
 
-CROSS JOIN LATERAL
-  get_shipment_item_cargo_balance(si.id) balance
+CROSS JOIN LATERAL (
+  SELECT
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'load'
+      ),
+      0
+    ) AS loaded_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'unload_before_departure'
+      ),
+      0
+    ) AS unloaded_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'receive'
+      ),
+      0
+    ) AS received_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'return'
+      ),
+      0
+    ) AS returned_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'loss'
+      ),
+      0
+    ) AS lost_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'writeoff'
+      ),
+      0
+    ) AS written_off_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'responsibility_transfer'
+      ),
+      0
+    ) AS transferred_quantity,
+
+    (
+      COALESCE(
+        SUM(co.quantity) FILTER (
+          WHERE co.operation_type = 'load'
+        ),
+        0
+      )
+      -
+      COALESCE(
+        SUM(co.quantity) FILTER (
+          WHERE co.operation_type IN (
+            'unload_before_departure',
+            'receive',
+            'return',
+            'loss',
+            'writeoff'
+          )
+        ),
+        0
+      )
+    ) AS unresolved_quantity
+
+  FROM shipment_cargo_operations co
+  WHERE co.shipment_item_id = si.id
+) balance
 
 WHERE balance.unresolved_quantity > 0;
 
 
 -- =========================================================
--- 7. DASHBOARD OVERVIEW METRICS
+-- 7. DASHBOARD SUMMARY
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_dashboard_summary AS
@@ -395,11 +527,7 @@ SELECT
   (
     SELECT COUNT(*)
     FROM shipments
-    WHERE status IN (
-      'pending',
-      'in_progress',
-      'partially_delivered'
-    )
+    WHERE status IN ('pending', 'in_transit')
   ) AS active_shipments,
 
   (
