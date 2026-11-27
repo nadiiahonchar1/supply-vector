@@ -1,8 +1,95 @@
 -- =========================================================
--- 1. DELIVERY TIME
+-- 1. SHIPMENT DELIVERY PERFORMANCE
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_shipment_delivery_performance AS
+WITH cargo AS (
+  SELECT
+    si.shipment_id,
+
+    MIN(co.occurred_at) FILTER (
+      WHERE co.operation_type = 'receive'
+    ) AS first_received_at,
+
+    MAX(co.occurred_at) FILTER (
+      WHERE co.operation_type = 'receive'
+    ) AS last_received_at,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'load'
+      ),
+      0
+    ) AS loaded_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'unload_before_departure'
+      ),
+      0
+    ) AS unloaded_before_departure_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'receive'
+      ),
+      0
+    ) AS received_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'return'
+      ),
+      0
+    ) AS returned_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'loss'
+      ),
+      0
+    ) AS lost_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'writeoff'
+      ),
+      0
+    ) AS written_off_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'responsibility_transfer'
+      ),
+      0
+    ) AS transferred_quantity
+
+  FROM shipment_items si
+
+  LEFT JOIN shipment_cargo_operations co
+    ON co.shipment_item_id = si.id
+
+  GROUP BY si.shipment_id
+),
+shipment_cargo AS (
+  SELECT
+    shipment_id,
+
+    SUM(loaded_quantity) AS loaded_quantity,
+    SUM(unloaded_before_departure_quantity)
+      AS unloaded_before_departure_quantity,
+    SUM(received_quantity) AS received_quantity,
+    SUM(returned_quantity) AS returned_quantity,
+    SUM(lost_quantity) AS lost_quantity,
+    SUM(written_off_quantity) AS written_off_quantity,
+    SUM(transferred_quantity) AS transferred_quantity,
+
+    MIN(first_received_at) AS first_received_at,
+    MAX(last_received_at) AS last_received_at
+
+  FROM cargo
+  GROUP BY shipment_id
+)
 SELECT
   s.id AS shipment_id,
   s.shipment_number,
@@ -11,101 +98,68 @@ SELECT
   s.source_storage_point_id,
   s.destination_storage_point_id,
   s.status,
-
   s.created_at,
 
-  departure.actual_departure_at,
+  t.actual_departure_at,
 
-  receiving.first_received_at,
-  receiving.last_received_at,
+  c.first_received_at,
+  c.last_received_at,
 
   CASE
-    WHEN departure.actual_departure_at IS NOT NULL
-     AND receiving.last_received_at IS NOT NULL
-    THEN EXTRACT(
-      EPOCH FROM (
-        receiving.last_received_at
-        - departure.actual_departure_at
-      )
-    ) / 3600
+    WHEN t.actual_departure_at IS NOT NULL
+      AND c.last_received_at IS NOT NULL
+    THEN ROUND(
+      (
+        EXTRACT(
+          EPOCH FROM (
+            c.last_received_at - t.actual_departure_at
+          )
+        ) / 3600
+      )::NUMERIC,
+      2
+    )
     ELSE NULL
   END AS delivery_duration_hours,
 
-  receiving.received_quantity,
+  COALESCE(c.loaded_quantity, 0) AS loaded_quantity,
 
-  COALESCE(cargo.returned_quantity, 0)
-    AS returned_quantity,
+  COALESCE(
+    c.unloaded_before_departure_quantity,
+    0
+  ) AS unloaded_before_departure_quantity,
 
-  COALESCE(cargo.lost_quantity, 0)
-    AS lost_quantity,
+  COALESCE(c.received_quantity, 0) AS received_quantity,
 
-  COALESCE(cargo.writeoff_quantity, 0)
+  COALESCE(c.returned_quantity, 0) AS returned_quantity,
+
+  COALESCE(c.lost_quantity, 0) AS lost_quantity,
+
+  COALESCE(c.written_off_quantity, 0)
     AS written_off_quantity,
 
-  COALESCE(cargo.transferred_quantity, 0)
-    AS responsibility_transferred_quantity
+  COALESCE(c.transferred_quantity, 0)
+    AS responsibility_transferred_quantity,
+
+  (
+    COALESCE(c.loaded_quantity, 0)
+    - COALESCE(c.unloaded_before_departure_quantity, 0)
+    - COALESCE(c.received_quantity, 0)
+    - COALESCE(c.returned_quantity, 0)
+    - COALESCE(c.lost_quantity, 0)
+    - COALESCE(c.written_off_quantity, 0)
+  ) AS unresolved_quantity
 
 FROM shipments s
 
-LEFT JOIN trips departure_trip
-  ON departure_trip.id = s.trip_id
+LEFT JOIN trips t
+  ON t.id = s.trip_id
 
-LEFT JOIN LATERAL (
-  SELECT
-    departure_trip.actual_departure_at
-) departure ON TRUE
-
-LEFT JOIN (
-  SELECT
-    si.shipment_id,
-
-    MIN(rm.received_at) AS first_received_at,
-
-    MAX(rm.received_at) AS last_received_at,
-
-    SUM(rm.quantity) AS received_quantity
-
-  FROM shipment_receipt_movements rm
-
-  JOIN shipment_items si
-    ON si.id = rm.shipment_item_id
-
-  GROUP BY si.shipment_id
-) receiving
-  ON receiving.shipment_id = s.id
-
-LEFT JOIN (
-  SELECT
-    si.shipment_id,
-
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'return'
-    ) AS returned_quantity,
-
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'loss'
-    ) AS lost_quantity,
-
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'writeoff'
-    ) AS writeoff_quantity,
-
-    SUM(m.quantity) FILTER (
-      WHERE m.movement_type = 'responsibility_transfer'
-    ) AS transferred_quantity
-
-  FROM shipment_cargo_movements m
-
-  JOIN shipment_items si
-    ON si.id = m.shipment_item_id
-
-  GROUP BY si.shipment_id
-) cargo
-  ON cargo.shipment_id = s.id;
+LEFT JOIN shipment_cargo c
+  ON c.shipment_id = s.id;
 
 
 -- =========================================================
--- 2. ADHERENCE TO SCHEDULED ARRIVAL TIME
+-- 2. TRIP STOP ARRIVAL PERFORMANCE
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_trip_stop_performance AS
@@ -117,20 +171,19 @@ SELECT
   ts.storage_point_id,
   sp.name AS storage_point_name,
 
-  ts.sequence,
+  ts.sequence_number,
 
   ts.planned_arrival_at,
   ts.actual_arrival_at,
 
   CASE
     WHEN ts.planned_arrival_at IS NOT NULL
-     AND ts.actual_arrival_at IS NOT NULL
+      AND ts.actual_arrival_at IS NOT NULL
     THEN ROUND(
       (
         EXTRACT(
           EPOCH FROM (
-            ts.actual_arrival_at
-            - ts.planned_arrival_at
+            ts.actual_arrival_at - ts.planned_arrival_at
           )
         ) / 60
       )::NUMERIC,
@@ -160,10 +213,77 @@ JOIN storage_points sp
 
 
 -- =========================================================
--- 3. PARTIAL DELIVERIES
+-- 3. PARTIAL DELIVERY ANALYTICS
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_partial_delivery_analytics AS
+WITH item_cargo AS (
+  SELECT
+    si.id AS shipment_item_id,
+    si.shipment_id,
+    si.product_id,
+    si.planned_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'load'
+      ),
+      0
+    ) AS loaded_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'unload_before_departure'
+      ),
+      0
+    ) AS unloaded_before_departure_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'receive'
+      ),
+      0
+    ) AS received_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'return'
+      ),
+      0
+    ) AS returned_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'loss'
+      ),
+      0
+    ) AS lost_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'writeoff'
+      ),
+      0
+    ) AS written_off_quantity,
+
+    COALESCE(
+      SUM(co.quantity) FILTER (
+        WHERE co.operation_type = 'responsibility_transfer'
+      ),
+      0
+    ) AS transferred_quantity
+
+  FROM shipment_items si
+
+  LEFT JOIN shipment_cargo_operations co
+    ON co.shipment_item_id = si.id
+
+  GROUP BY
+    si.id,
+    si.shipment_id,
+    si.product_id,
+    si.planned_quantity
+)
 SELECT
   s.id AS shipment_id,
   s.shipment_number,
@@ -171,83 +291,39 @@ SELECT
   s.transfer_request_id,
   s.status,
 
-  COUNT(si.id) AS item_count,
+  COUNT(ic.shipment_item_id) AS item_count,
 
-  COALESCE(
-    SUM(si.planned_quantity),
-    0
-  ) AS planned_quantity,
+  SUM(ic.planned_quantity) AS planned_quantity,
 
-  COALESCE(
-    SUM(received.received_quantity),
-    0
-  ) AS received_quantity,
+  SUM(ic.loaded_quantity) AS loaded_quantity,
 
-  COALESCE(
-    SUM(cargo.returned_quantity),
-    0
-  ) AS returned_quantity,
+  SUM(ic.unloaded_before_departure_quantity)
+    AS unloaded_before_departure_quantity,
 
-  COALESCE(
-    SUM(cargo.lost_quantity),
-    0
-  ) AS lost_quantity,
+  SUM(ic.received_quantity) AS received_quantity,
 
-  COALESCE(
-    SUM(cargo.writeoff_quantity),
-    0
-  ) AS written_off_quantity,
+  SUM(ic.returned_quantity) AS returned_quantity,
 
-  COALESCE(
-    SUM(cargo.transferred_quantity),
-    0
-  ) AS responsibility_transferred_quantity
+  SUM(ic.lost_quantity) AS lost_quantity,
+
+  SUM(ic.written_off_quantity) AS written_off_quantity,
+
+  SUM(ic.transferred_quantity)
+    AS responsibility_transferred_quantity,
+
+  SUM(
+    ic.loaded_quantity
+    - ic.unloaded_before_departure_quantity
+    - ic.received_quantity
+    - ic.returned_quantity
+    - ic.lost_quantity
+    - ic.written_off_quantity
+  ) AS unresolved_quantity
 
 FROM shipments s
 
-JOIN shipment_items si
-  ON si.shipment_id = s.id
-
-LEFT JOIN LATERAL (
-  SELECT
-    COALESCE(SUM(rm.quantity), 0) AS received_quantity
-  FROM shipment_receipt_movements rm
-  WHERE rm.shipment_item_id = si.id
-) received ON TRUE
-
-LEFT JOIN LATERAL (
-  SELECT
-    COALESCE(
-      SUM(m.quantity) FILTER (
-        WHERE m.movement_type = 'return'
-      ),
-      0
-    ) AS returned_quantity,
-
-    COALESCE(
-      SUM(m.quantity) FILTER (
-        WHERE m.movement_type = 'loss'
-      ),
-      0
-    ) AS lost_quantity,
-
-    COALESCE(
-      SUM(m.quantity) FILTER (
-        WHERE m.movement_type = 'writeoff'
-      ),
-      0
-    ) AS written_off_quantity,
-
-    COALESCE(
-      SUM(m.quantity) FILTER (
-        WHERE m.movement_type = 'responsibility_transfer'
-      ),
-      0
-    ) AS transferred_quantity
-
-  FROM shipment_cargo_movements m
-  WHERE m.shipment_item_id = si.id
-) cargo ON TRUE
+JOIN item_cargo ic
+  ON ic.shipment_id = s.id
 
 GROUP BY
   s.id,
@@ -257,13 +333,12 @@ GROUP BY
   s.status
 
 HAVING
-  COALESCE(SUM(received.received_quantity), 0) > 0
-  AND COALESCE(SUM(si.planned_quantity), 0)
-      > COALESCE(SUM(received.received_quantity), 0);
+  SUM(ic.received_quantity) > 0
+  AND SUM(ic.received_quantity) < SUM(ic.planned_quantity);
 
 
 -- =========================================================
--- 4. DISCREPANCIES DURING THE ADJUSTMENT OF BALANCE
+-- 4. INVENTORY ADJUSTMENT ANALYTICS
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_inventory_adjustment_analytics AS
@@ -303,7 +378,157 @@ WHERE im.movement_type = 'adjustment';
 
 
 -- =========================================================
--- 5. EFFICIENCY OF TRANSPORT USE
+-- 5. PEAK CARGO UTILIZATION BY TRIP
+-- =========================================================
+
+CREATE OR REPLACE VIEW v_trip_peak_cargo_utilization AS
+WITH cargo_events AS (
+  SELECT
+    s.trip_id,
+    co.id AS operation_id,
+    co.occurred_at,
+    si.product_id,
+
+    CASE
+      WHEN co.operation_type = 'load'
+      THEN co.quantity
+
+      WHEN co.operation_type IN (
+        'unload_before_departure',
+        'receive',
+        'return',
+        'loss',
+        'writeoff'
+      )
+      THEN -co.quantity
+
+      ELSE 0
+    END AS quantity_delta,
+
+    p.weight_kg,
+    p.volume_m3
+
+  FROM shipment_cargo_operations co
+
+  JOIN shipment_items si
+    ON si.id = co.shipment_item_id
+
+  JOIN shipments s
+    ON s.id = si.shipment_id
+
+  JOIN products p
+    ON p.id = si.product_id
+
+  WHERE s.trip_id IS NOT NULL
+),
+trip_running_load AS (
+  SELECT
+    trip_id,
+    operation_id,
+    occurred_at,
+
+    SUM(
+      quantity_delta * weight_kg
+    ) OVER (
+      PARTITION BY trip_id
+      ORDER BY occurred_at, operation_id
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS current_weight_kg,
+
+    SUM(
+      quantity_delta * volume_m3
+    ) OVER (
+      PARTITION BY trip_id
+      ORDER BY occurred_at, operation_id
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS current_volume_m3
+
+  FROM cargo_events
+),
+trip_peak_load AS (
+  SELECT
+    trip_id,
+
+    MAX(current_weight_kg) AS peak_weight_kg,
+
+    MAX(current_volume_m3) AS peak_volume_m3
+
+  FROM trip_running_load
+  GROUP BY trip_id
+),
+trip_attribute_completeness AS (
+  SELECT
+    trip_id,
+
+    BOOL_OR(weight_kg IS NULL)
+      AS has_missing_weight,
+
+    BOOL_OR(volume_m3 IS NULL)
+      AS has_missing_volume
+
+  FROM cargo_events
+  WHERE quantity_delta > 0
+  GROUP BY trip_id
+)
+SELECT
+  t.id AS trip_id,
+  t.trip_number,
+  t.status AS trip_status,
+
+  v.id AS vehicle_id,
+  v.registration_number,
+  v.brand,
+  v.model,
+
+  v.max_weight_kg,
+  v.max_volume_m3,
+
+  CASE
+    WHEN COALESCE(c.has_missing_weight, FALSE)
+    THEN NULL
+    ELSE COALESCE(p.peak_weight_kg, 0)
+  END AS peak_weight_kg,
+
+  CASE
+    WHEN COALESCE(c.has_missing_volume, FALSE)
+    THEN NULL
+    ELSE COALESCE(p.peak_volume_m3, 0)
+  END AS peak_volume_m3,
+
+  CASE
+    WHEN COALESCE(c.has_missing_weight, FALSE)
+    THEN NULL
+    ELSE ROUND(
+      COALESCE(p.peak_weight_kg, 0)
+      / v.max_weight_kg * 100,
+      2
+    )
+  END AS peak_weight_utilization_percent,
+
+  CASE
+    WHEN COALESCE(c.has_missing_volume, FALSE)
+    THEN NULL
+    ELSE ROUND(
+      COALESCE(p.peak_volume_m3, 0)
+      / v.max_volume_m3 * 100,
+      2
+    )
+  END AS peak_volume_utilization_percent
+
+FROM trips t
+
+JOIN vehicles v
+  ON v.id = t.vehicle_id
+
+LEFT JOIN trip_peak_load p
+  ON p.trip_id = t.id
+
+LEFT JOIN trip_attribute_completeness c
+  ON c.trip_id = t.id;
+
+
+-- =========================================================
+-- 6. VEHICLE UTILIZATION ANALYTICS
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_vehicle_utilization_analytics AS
@@ -326,23 +551,31 @@ SELECT
     WHERE t.status = 'cancelled'
   ) AS cancelled_trips,
 
-  COALESCE(
-    AVG(util.weight_utilization_percent),
-    0
-  ) AS average_weight_utilization_percent,
+  ROUND(
+    AVG(
+      u.peak_weight_utilization_percent
+    ) FILTER (
+      WHERE u.peak_weight_utilization_percent IS NOT NULL
+    ),
+    2
+  ) AS average_peak_weight_utilization_percent,
 
-  COALESCE(
-    AVG(util.volume_utilization_percent),
-    0
-  ) AS average_volume_utilization_percent
+  ROUND(
+    AVG(
+      u.peak_volume_utilization_percent
+    ) FILTER (
+      WHERE u.peak_volume_utilization_percent IS NOT NULL
+    ),
+    2
+  ) AS average_peak_volume_utilization_percent
 
 FROM vehicles v
 
 LEFT JOIN trips t
   ON t.vehicle_id = v.id
 
-LEFT JOIN v_trip_cargo_utilization util
-  ON util.trip_id = t.id
+LEFT JOIN v_trip_peak_cargo_utilization u
+  ON u.trip_id = t.id
 
 GROUP BY
   v.id,
@@ -354,7 +587,7 @@ GROUP BY
 
 
 -- =========================================================
--- 6. GENERAL DELIVERY METRICS
+-- 7. DELIVERY PERFORMANCE SUMMARY
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_delivery_performance_summary AS
@@ -362,28 +595,25 @@ SELECT
   COUNT(*) AS total_shipments,
 
   COUNT(*) FILTER (
-    WHERE status = 'delivered'
-  ) AS fully_delivered_shipments,
+    WHERE status = 'completed'
+  ) AS completed_shipments,
 
   COUNT(*) FILTER (
-    WHERE status = 'partially_fulfilled'
-  ) AS partially_fulfilled_shipments,
+    WHERE status = 'cancelled'
+  ) AS cancelled_shipments,
 
   COUNT(*) FILTER (
-    WHERE status = 'partially_delivered'
-  ) AS partially_delivered_shipments,
+    WHERE status = 'in_transit'
+  ) AS in_transit_shipments,
 
   COUNT(*) FILTER (
-    WHERE status = 'returned'
-  ) AS returned_shipments,
+    WHERE status = 'pending'
+  ) AS pending_shipments,
 
-  COUNT(*) FILTER (
-    WHERE status = 'lost'
-  ) AS lost_shipments,
-
-  COUNT(*) FILTER (
-    WHERE status = 'settled'
-  ) AS settled_shipments,
+  (
+    SELECT COUNT(*)
+    FROM v_partial_delivery_analytics
+  ) AS partially_received_shipments,
 
   ROUND(
     AVG(delivery_duration_hours)::NUMERIC,
@@ -399,7 +629,7 @@ FROM v_shipment_delivery_performance;
 
 
 -- =========================================================
--- 7. GENERAL STATISTICS OF ARRIVALS AT POINTS
+-- 8. ARRIVAL PERFORMANCE SUMMARY
 -- =========================================================
 
 CREATE OR REPLACE VIEW v_arrival_performance_summary AS
